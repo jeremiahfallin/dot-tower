@@ -1,0 +1,54 @@
+# --- Rust / Cargo ---------------------------------------------------------
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo.lock is deliberately NOT ignored. dot-tower is a binary crate, and
+# Cargo's own guidance is to commit the lockfile for binaries so builds are
+# reproducible. Do not add it here.
+
+# --- Bevy -----------------------------------------------------------------
+# Output of Bevy's asset processing pipeline; regenerated from assets/.
+imported_assets/
+
+# Source assets under assets/ ARE tracked — do not ignore that directory.
+
+# --- Android --------------------------------------------------------------
+# Gradle build outputs and machine-specific config.
+.gradle/
+**/build/
+local.properties
+.cxx/
+
+# Build artifacts.
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Signing keys — must never be committed. A leaked upload key cannot be
+# rotated without Google Play support intervention.
+*.keystore
+*.jks
+keystore.properties
+
+# --- Web / wasm (bevy_cli) ------------------------------------------------
+/dist/
+/wasm/
+
+# --- macOS ----------------------------------------------------------------
+.DS_Store
+.AppleDouble
+._*
+
+# --- Editors --------------------------------------------------------------
+.idea/
+*.swp
+*.swo
+*~
+# .vscode/ is intentionally not ignored — shared launch/task configs are
+# often worth tracking. Add specific files here if that changes.
+
+# --- Notes ----------------------------------------------------------------
+# .scratch/ is NOT ignored. It is this repo's issue tracker (see
+# docs/agents/issue-tracker.md) and must stay tracked.

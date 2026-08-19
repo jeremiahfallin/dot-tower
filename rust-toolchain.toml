@@ -1,0 +1,5 @@
+# Bevy 0.19.1 declares rust-version = "1.95.0". Pinning the channel keeps every
+# machine and CI runner above that floor.
+[toolchain]
+channel = "stable"
+targets = ["aarch64-linux-android", "x86_64-linux-android"]

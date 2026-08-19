@@ -1,0 +1,63 @@
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+android {
+    namespace 'dev.dottower'
+    compileSdk 36
+
+    // Set by scripts/android-setup.sh. Left unset, Gradle picks its own default
+    // NDK, which may not be the one cargo-ndk built the .so with.
+    if (project.hasProperty('ndkVersion') && project.ndkVersion) {
+        ndkVersion project.ndkVersion
+    }
+
+    defaultConfig {
+        applicationId "dev.dottower"
+        minSdk 31
+        // API 36 rather than the 33 Bevy's example uses: Google Play requires
+        // 36 for updates from 2026-08-31. Building against it now avoids
+        // discovering the gap at release time.
+        targetSdk 36
+        versionCode 1
+        versionName "0.1.0"
+        ndk {
+            // The bringup device only. Add 'armeabi-v7a' if a 32-bit device
+            // needs testing; each ABI is a separate Rust build.
+            abiFilters 'arm64-v8a'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            // Keep the native symbols; probe E's timings are read from logcat.
+            debuggable true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        prefab true
+    }
+
+    sourceSets {
+        main {
+            // cargo-ndk writes libdot_tower.so here; see scripts/android-build.sh.
+            jniLibs.srcDirs = ['src/main/jniLibs']
+            assets.srcDirs += files('../../assets')
+        }
+    }
+}
+
+dependencies {
+    implementation libs.appcompat
+    implementation libs.games.activity
+}

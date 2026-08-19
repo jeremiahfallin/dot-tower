@@ -1,0 +1,49 @@
+[package]
+name = "dot-tower"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "A pixel-art idle tower-climbing auto-battler."
+
+# Android links the game as a shared library loaded by GameActivity, so we need
+# a cdylib. `lib` keeps the same code usable from src/main.rs on desktop.
+[lib]
+name = "dot_tower"
+crate-type = ["lib", "cdylib"]
+
+[[bin]]
+name = "dot-tower"
+path = "src/main.rs"
+
+[dependencies]
+# Pinned to 0.19.1, not "0.19": 0.19.0 shipped a P-Regression sprite flicker
+# (#25163) in a config near-identical to ours. See .scratch/dot-tower/issues/13.
+#
+# The feature list is load-bearing and easy to get silently wrong. On 0.19 the
+# `2d` collection no longer implies `ui` (#23180), and `default_platform` no
+# longer implies `android-game-activity` (#23708). `features = ["2d"]` alone
+# compiles fine and yields no bevy_ui and no Android activity backend.
+# `ui_picking` is NOT part of the `ui` collection. It gates `UiPickingPlugin`
+# (bevy_ui/src/lib.rs:178 -> #[cfg(feature = "bevy_picking")]). Without it, UI
+# nodes are not pickable and `Pointer<..>` observers on them never fire. Since
+# this project bans `Interaction` (#11553 aggregates touches globally, which
+# breaks the four multi-touch ability buttons), picking observers are our ONLY
+# UI input path — so this feature is load-bearing, not optional.
+bevy = { version = "0.19.1", default-features = false, features = [
+    "2d",
+    "ui",
+    "ui_picking",
+    "android-game-activity",
+] }
+
+# Bevy is a large dependency tree; building it unoptimised makes the game
+# unplayably slow, and building our own code optimised makes iteration slow.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

@@ -42,3 +42,38 @@ Findings: [research/13-bevy-version-target.md](../research/13-bevy-version-targe
 **Two caveats, flagged not smoothed:** #14710 is still marked `open` and nobody re-tested *released* 0.19 on affected hardware — high-confidence inference, not certainty; verify in ticket 04. And 0.19.0 shipped with a `P-Regression` sprite flicker (#25163) in a config near-identical to ours, fixed in 0.19.1 — hence pinning `0.19.1`, not `0.19`.
 
 Status: resolved
+
+## Corrected by ticket 04
+
+The stated build config is **incomplete**. Adding `ui_picking`:
+
+```toml
+bevy = { version = "0.19.1", default-features = false, features = [
+    "2d", "ui", "ui_picking", "android-game-activity",
+] }
+```
+
+This ticket read the `ui_picking` weak-dep correctly but drew the conclusion only
+about `android-game-activity`. Verified against the vendored 0.19.1 source:
+
+- `bevy-0.19.1/Cargo.toml` — the `ui` collection is `["default_app",
+  "default_platform", "ui_api", "ui_bevy_render", "scene", "picking",
+  "bevy_ui_widgets"]`. **`ui_picking` is not in it.**
+- `bevy_ui-0.19.1/src/lib.rs:178` — `UiPickingPlugin` is added under
+  `#[cfg(feature = "bevy_picking")]`, which only `bevy_internal/ui_picking`
+  turns on.
+
+The `picking` in the `ui` collection is `bevy_picking` itself — the pointer
+abstraction and observer machinery. It is not the **UI backend** that decides
+which UI node a pointer is over. Without `ui_picking` the app compiles, runs,
+and `Pointer<..>` observers on UI nodes simply never fire.
+
+This is load-bearing rather than cosmetic because ticket 02 banned `Interaction`
+(#11553 aggregates touches globally, breaking the four-button multi-touch
+surface). Picking observers are therefore the *only* UI input path in this
+project — so `features = ["2d", "ui", "android-game-activity"]` would have
+yielded an app with **no working UI input at all**, failing silently.
+
+Also confirmed while building against it: **Bevy 0.19.1 declares
+`rust-version = "1.95.0"`.** This machine was on 1.89.0 and could not have
+compiled it. Now on 1.97.1; `rust-toolchain.toml` pins the channel.

@@ -13,12 +13,19 @@ imported_assets/
 
 # Source assets under assets/ ARE tracked — do not ignore that directory.
 
+# --- Local environment ----------------------------------------------------
+# Written by scripts/android-setup.sh: SDK/NDK/JDK paths for this machine.
+.env
+
 # --- Android --------------------------------------------------------------
 # Gradle build outputs and machine-specific config.
 .gradle/
 **/build/
 local.properties
 .cxx/
+
+# Rust build output staged for packaging by scripts/android-build.sh.
+android/app/src/main/jniLibs/
 
 # Build artifacts.
 *.apk

@@ -1,0 +1,18 @@
+[versions]
+# AGP 8.13.2 is the newest 8.x. compileSdk 36 needs AGP 8.9+, so this is the
+# most conservative version that reaches the API level Google Play will require
+# for updates from 2026-08-31. AGP 9.x is available but is a much larger jump.
+agp = "8.13.2"
+# Bevy's own example pins 4.4.0 with the note that this must stay compatible
+# with the `android-activity` crate (0.6.1 here). A mismatch between the Java
+# GameActivity and the vendored native glue fails at runtime, not build time,
+# so this tracks Bevy's tested value rather than the newest release (4.4.2).
+gamesActivity = "4.4.0"
+appcompat = "1.7.0"
+
+[libraries]
+appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+games-activity = { group = "androidx.games", name = "games-activity", version.ref = "gamesActivity" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }

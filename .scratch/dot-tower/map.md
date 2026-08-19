@@ -33,7 +33,7 @@ This map is done when nothing is left to decide before someone sits down and bui
 - Hero placement is a **throttle**, not a wall-breaker: below the wall it farms and escorts, at the wall it pushes. The tradeoff must be made visible.
 - Climbers are disposable and anonymous as individuals; the **climber type** carries identity. Three types in the slice — melee, ranged, healer — with data keyed by type from day one.
 - **Rank** is the upgrade axis for climbers. Hero levels and climber ranks both reset on prestige.
-- **Lock** costs gold, sets the spawn floor, is permanent within a run, is undone by prestige, and yields a guaranteed passive income rate. Every 10 floors.
+- **Lock** costs gold, sets the spawn floor, is permanent within a run, and is undone by prestige. Every 10 floors. *Amended by ticket 06: it yields no meaningful passive income — locking is a spawn-point and travel-time mechanic, not an economic pillar.*
 - Prestige grants a **permanent multiplier** on health and damage — the single permanent power axis. It must present an explicit before/after.
 - **Relics modify, prestige multiplies.** Relics grant qualitative effects (income, lock cost, cooldowns, spawn rate) and may favour specific climber types. No relic reads "+15% damage".
 - Offline progress yields **gold only**, closed-form, capped at roughly 8–12 hours. The climb does not advance while away.
@@ -48,6 +48,7 @@ This map is done when nothing is left to decide before someone sits down and bui
 - [Target Bevy 0.18 or 0.19?](issues/13-bevy-version-target.md) — **0.19.1**, decided by #14710 (bevy_ui Android flicker) being fixed transitively via wgpu 29, which 0.18 pins too old to receive and can never be backported. #22925 (Adreno `Material2d` crash) is unfixed in both. Build config is `features = ["2d", "ui", "ui_picking", "android-game-activity"]` — on 0.19 the `2d` collection silently no longer implies `ui` or the Android backend, and `ui` does not imply `ui_picking` (corrected by ticket 04; without it no UI input works at all). Bevy 0.19.1 requires Rust 1.95.
 - [The simulation boundary](issues/03-simulation-boundary.md) — two regions: sealed floors emit a frozen gold rate and nothing else, the active band is uncapped with floors activating lazily as climbers approach. No agreement contract exists — locking is a one-way conversion, measured and frozen. Positions are continuous inside a clamped floor-local space, making wall-escape unrepresentable. `FixedUpdate` at 10Hz. Cleared floors repopulate on a timer (which *is* the farming mechanic); failed floors reset immediately, so attrition can't beat a wall.
 - [Climber lifetime and the healer](issues/05-climber-lifetime-and-healer.md) — climbers persist **until death** with **no HP regeneration**, which makes the Wall emergent rather than declared. No party; the individual is the unit of survival. The healer is a **pure-support aura**, stacking linearly, targeting built as a swappable policy. The hero has HP, dies, and respawns **on its stationed floor**, so the throttle is *uptime*. Population cap is **per climber type**, so composition is contested in gold, not slots. Deaths are legible in aggregate at the wall, not per-unit.
+- [Progression curve, first pass](issues/06-progression-curve-first-pass.md) — the first-pass constants, in RON. Enemy health and damage ×1.075/floor against gold ×1.095, which makes deeper floors strictly more gold-efficient and is the engine pulling the player upward; past ~1.12 gold the economy runs away. Healer targeting switches from the aura to **single-target, lowest percentage** — the aura fully out-healed the climb, so climbers reached the wall at 100% and the Wall was declared rather than emergent. **Prestige compounds** (a best-ever-floor multiplier dead-ends at floor ~220), and must be shown as *floors of head start*, never as ×10¹¹. Replacement rate, not the respawn timer, is the run-length dial. f64 holds to ~floor 2,000. Runs land in a 30–60 minute band; floor 1,000 arrives around run 10.
 
 ## Not yet specified
 
@@ -57,10 +58,11 @@ In scope, but not yet sharp enough to ticket. Graduates as the frontier advances
 - **Enemy and floor variety.** What actually lives on floor 400 that didn't live on floor 40, and whether floors have visual or mechanical themes. Hangs on the curve.
 - **Setting, tone, and narrative framing.** Thousand Floors leans on the Classic of Mountains and Seas. dot-tower has no setting yet. Not urgent, but it shapes art direction.
 - **Art pipeline past placeholder.** Palette, sprite dimensions, animation budget, whether to buy a pack or commission. Waits on the loop being proven fun.
-- **Healer targeting policies beyond the aura.** The seam ships in the slice but the aura is the only policy, and no UI exposes it. Whether a second policy earns its place — and whether the player should set it per climber type — waits on watching the aura in play.
+- **Exposing healer targeting to the player.** Ticket 06 built the policy seam and settled single-target lowest-percentage as the shipped default, so what remains is whether the player ever chooses — a standing order set per climber type — and whether a second policy earns its place. Waits on watching the shipped one in play.
 - **Audio.** Entirely unexamined.
 - **Accessibility.** Colourblind-safe type differentiation and text legibility on a portrait phone. Likely to bite once three climber types must be told apart at a glance.
-- **Balance methodology past the first curve.** How tuning gets validated — headless sim runs, telemetry, playtesting.
+- **Balance methodology past the first curve.** How tuning gets validated — headless sim runs, telemetry, playtesting. Ticket 06's model is the obvious seed; whether it becomes a kept tool or stays throwaway is unresolved.
+- **Where offline return gets its substance.** Ticket 06 removed sealed income as a source, so ticket 07 has no premise. Whether offline return is about gold at all, or about something else entirely, is now open.
 - **Steam release mechanics.** Store page, pricing, wishlists, build pipeline.
 
 ## Out of scope

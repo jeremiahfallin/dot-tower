@@ -16,3 +16,14 @@ Settled: gold only, closed-form, capped at roughly 8-12 hours, no floor progress
 4. **The return screen.** Under the legibility constraint this must be answerable in one sentence: *"Away 6h 12m. Floors 1-120 earned 4.2M gold."* What exactly does it show, and does it appear as a modal, a banner, or a ledger entry?
 5. **Zero-progress honesty.** If the player was away 20 minutes and earned almost nothing, does the screen still appear? Suppressing it hides the mechanic; always showing it becomes noise.
 6. **First-session behaviour.** Before anything is locked, offline earns nothing. Does the game explain why, or silently show zero? Silently showing zero is exactly the Thousand Floors failure.
+
+## Added by ticket 06
+
+**Offline gold has no source.** This ticket's premise was that offline progress yields gold
+only, closed-form, capped at 8–12 hours. Ticket 06 removed the thing that was going to generate
+it: sealed floors produce no meaningful income (0.04% of frontier earnings), and the climb does
+not advance while away.
+
+So there is nothing left running. This ticket needs a new premise before it can be worked —
+either offline gold comes from somewhere other than sealed floors, or offline return is not
+about gold at all.

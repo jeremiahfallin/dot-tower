@@ -36,3 +36,19 @@ That is a materially weaker constraint, and it may not be enough. Resolve:
 
 Blocked on ticket 06 because whether gold competition bites at all depends on the
 income and rank cost curves.
+
+## Added by ticket 06
+
+The ground under this ticket moved. The per-type caps (melee 40, ranged 30, healer 20) were
+sized against an **aura**, whose value scaled with how many wounded units sat in radius. The
+healer is now **single-target**, so a healer's output is one unit's worth regardless of how many
+are hurt — the marginal value of the twentieth healer is completely different from what the cap
+was chosen for.
+
+Two measurements worth carrying in:
+
+- Healing lands roughly **66% melee, 17% ranged, 5% healers, 13% hero**. Melee dominates because
+  it carries the highest threat weight and eats most of the incoming damage.
+- Replacement rate is per type and only fires while that type is under its cap — settled at 5s.
+  It turned out to be the run-length dial for the whole game, so composition and pacing are
+  coupled through it.

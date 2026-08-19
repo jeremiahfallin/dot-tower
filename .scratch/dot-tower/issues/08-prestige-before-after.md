@@ -19,3 +19,19 @@ Make a rough mockup — paper, a static image, an HTML sketch, anything reactabl
 5. **First prestige specifically.** The player has never seen this before and has no baseline. Does it need explaining, and where?
 
 Link the mockup from this ticket.
+
+## Added by ticket 06
+
+Settled: **the multiplier compounds** — each run's multiplier multiplies the last. This was
+forced rather than chosen. Deriving it from best-ever floor instead reaches a fixed point around
+floor 220 and the game stops permanently, because floor buys multiplier buys floor and the loop
+closes.
+
+The cost lands squarely on this ticket. Compounding reaches **×10¹¹ by floor 1,000** and keeps
+going, which is precisely the illegible number this project exists to avoid. The model's
+suggestion: present it as **floors of head start** — `ln(M) / ln(enemy_hp_base)` — so ×10¹¹
+reads as "worth about 350 floors" instead. The raw multiplier should probably never appear.
+
+Also relevant: the multiplier buys floors logarithmically while floors cost exponentially, so
+run two re-reaches run one's ceiling in about a third of the time and that ratio shrinks every
+run after. Whatever this screen promises has to stay honest as the returns flatten.

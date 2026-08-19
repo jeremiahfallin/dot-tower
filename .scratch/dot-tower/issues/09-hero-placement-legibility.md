@@ -2,7 +2,7 @@
 
 Type: prototype
 Status: open
-Blocked by: 03, 06
+Blocked by: 03, 06, 16
 
 ## Question
 
@@ -40,3 +40,11 @@ is climbers sprinting up to the new entry floor, but the hero's floor is a delib
 player choice, and silently relocating it changes that choice without telling them.
 Options are to block locking past the stationed floor, relocate with an explicit
 notice, or have the hero sprint up exactly as climbers do.
+
+
+## Added by ticket 06
+
+The premise does not currently hold: there is no placement tradeoff to make visible.
+Stationed at the wall, below it, or not at all, the peak floor moves by under 2%. Patrol
+zones and hero regeneration change nothing. Ticket 16 now has to establish what the hero
+contributes before this ticket has a subject.

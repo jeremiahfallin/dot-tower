@@ -130,3 +130,37 @@ Three consequences fall out that the boundary did not previously have to answer:
    an addendum on ticket 09 rather than answered here.
 
 Status: resolved
+
+## Amended by ticket 06
+
+Three corrections from modelling the curve. The shape of this ticket survives — climbers
+persist until death, no regeneration, no party, per-type caps, hero dies and respawns on post —
+but three specifics do not.
+
+**1. The healer is no longer an aura.** Targeting is **single-target, lowest percentage of
+health**, reach ±1 floor. The aura's problem was that it worked: heals landing on every damaged
+unit in radius, stacking linearly, fully out-healed everything the climb did, so climbers
+reached the wall at **99–100% health**. That makes the Wall a flat power check against the
+frontier floor — *declared*, exactly what this ticket set out to avoid. Single-target is
+roughly a five-fold cut in sustain and puts arrival health at 83%, which makes the Wall
+emergent again. The swappable policy seam this ticket promised is what made the switch cheap.
+
+**2. The stated reason for rejecting "lowest absolute HP" is backwards.** This ticket argues
+the hero's pool dwarfs a climber's, so that policy would silently become hero-dedicated.
+Measured, it is the opposite: a big pool means the hero's *raw* health is usually the highest
+number in range, so the policy almost never picks it — **1.8%** of all healing, less than the
+aura's own 3.5%. The policy that magnetises to the hero is lowest-*percentage*, at 12.5%,
+because the hero tanks and drops proportionally fastest. The rejection stands on other grounds;
+the reasoning under it does not.
+
+**3. Keeping the hero in the candidate set is not free.** This ticket keeps it there with no
+special-casing, arguing it buys a link between placement and composition for nothing. It costs
+**13% of every point of healing in a run**, and removing it raises the peak floor from 172 to
+178 while pushing melee's share from 66% to 76%. Whether that trade is worth it is now part of
+ticket 16, since it depends on what the hero turns out to contribute.
+
+**Aura reach is a free choice.** Widening it from the healer's own floor to ±3 changes nothing
+measurable, because combat concentrates every climber on the contested floor and a wider radius
+rarely finds anyone new. Settled at **±1**. Worth noting that reach 0 would have dissolved the
+`FloorPos` radius gap this ticket raised — "radius" needs no definition if it never crosses a
+floor — and that option remains available at no cost if the coordinate question bites later.

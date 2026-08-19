@@ -60,3 +60,27 @@ Per-enemy HP does **not** persist across deactivation. Only the cleared flag and
 **Invariant discipline — wrap position and gold, nothing else.** The rule: wrap a value when a wrong one would be **silent**. A climber rendering happily inside a wall is silent; a gold underflow to a nonsense balance is silent. A negative cooldown fires an ability instantly and a wrong enemy count is visible on screen — both self-announce, so a wrapper buys ceremony rather than safety.
 
 Status: resolved
+
+## Amended by ticket 06
+
+**Sealed floors produce no meaningful income, and the measure-and-freeze conversion is
+withdrawn.**
+
+Modelling the curve showed the rule cannot work as written. You only lock a floor once you
+have safely climbed past it, so the band below the new line has been empty for minutes and
+its measured 60-second output reads zero — four of eleven locks in a default run froze an
+income of exactly zero.
+
+Changing the measurement window does not rescue it. Gold per kill scales at 1.095/floor
+against enemy health at 1.075, so a sealed band is always far behind the frontier in value:
+the final frozen rate was 1.0×10⁴/s against a frontier income of 2.6×10⁷/s — **0.04% of the
+money**. Even the closed-form ceiling for a band (what it would yield if farmed continuously)
+came to 0.35%.
+
+Accepted rather than fixed. **Locking is a spawn-point and travel-time mechanic, not an
+economic pillar.** It still earns its cost — peak floor 176 with locks against 155 without —
+because raising the lock line shortens the transit every climber re-walks.
+
+Everything else in this ticket stands: the two-region partition, the uncapped active band,
+`FloorPos` with clamped `NormX`, `FixedUpdate` at 10Hz, the floor lifecycle, and the transition
+rules. The seam is still one-way; it just carries no gold across it.

@@ -44,6 +44,14 @@ _Avoid_: Level, tier, star
 The single persistent unit the player selects and stations on a floor it repeats across. It fights automatically; its abilities are triggered by hand.
 _Avoid_: Champion, leader, commander, climber
 
+**Aura**:
+A continuous effect applied to every friendly within a radius, with no target selection. The healer's heal is one.
+_Avoid_: Buff, field, pulse
+
+**Type cap**:
+The maximum number of live climbers of a single climber type. Each type has its own; there is no cap across the stream as a whole.
+_Avoid_: Population cap, unit limit, squad size
+
 **Ability**:
 One of four cooldown-gated actions a hero possesses, fired manually by the player. There is no mana or energy resource.
 _Avoid_: Skill, spell, art, power

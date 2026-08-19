@@ -1,0 +1,641 @@
+<title>Progression Curve, First Pass</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --ground:#EBEDF1; --surface:#FFFFFF; --surface-2:#F3F4F8; --line:#D3D7E0;
+  --ink:#15171E; --ink-2:#41465A; --muted:#6B7189;
+  --accent:#B4770E; --accent-soft:#F2E4C6;
+  --wall:#AE4A36; --wall-soft:#F4DFD9;
+  --ok:#4F7439; --sealed:#48589A;
+  --shadow:0 1px 2px rgba(20,24,40,.06),0 8px 24px -12px rgba(20,24,40,.18);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  color-scheme:dark;
+  --ground:#0E1016; --surface:#171A22; --surface-2:#1E222C; --line:#2C3140;
+  --ink:#E9EBF1; --ink-2:#B4BACB; --muted:#848BA0;
+  --accent:#E3A63A; --accent-soft:#3A2F16;
+  --wall:#E07A62; --wall-soft:#3A241E;
+  --ok:#8CB46B; --sealed:#8496D4;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ground:#0E1016; --surface:#171A22; --surface-2:#1E222C; --line:#2C3140;
+  --ink:#E9EBF1; --ink-2:#B4BACB; --muted:#848BA0;
+  --accent:#E3A63A; --accent-soft:#3A2F16;
+  --wall:#E07A62; --wall-soft:#3A241E;
+  --ok:#8CB46B; --sealed:#8496D4;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:Archivo,"Helvetica Neue",Arial,sans-serif;font-size:15px;line-height:1.55;
+  -webkit-font-smoothing:antialiased}
+.mono{font-family:"DM Mono",ui-monospace,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+h1,h2,h3{text-wrap:balance;margin:0}
+.wrap{max-width:1400px;margin:0 auto;padding:32px 24px 96px}
+
+/* ---------- header ---------- */
+header{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:28px}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.eyebrow .stamp{color:var(--wall);border:1px solid currentColor;border-radius:2px;padding:1px 6px;letter-spacing:.1em}
+h1{font-size:clamp(30px,4.4vw,46px);font-weight:700;letter-spacing:-.022em;margin:12px 0 0;line-height:1.05}
+.question{max-width:64ch;color:var(--ink-2);margin-top:14px}
+.question strong{color:var(--ink);font-weight:600}
+
+/* ---------- layout ---------- */
+.cols{display:grid;grid-template-columns:326px minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:1000px){.cols{grid-template-columns:1fr}}
+.rail{position:sticky;top:20px;display:flex;flex-direction:column;gap:14px}
+@media (max-width:1000px){.rail{position:static}}
+.results{display:flex;flex-direction:column;gap:22px;min-width:0}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;
+  padding:18px 18px 20px;box-shadow:var(--shadow)}
+.card>h2{font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;margin-bottom:4px}
+.card>.sub{font-size:13px;color:var(--muted);margin:0 0 16px;max-width:70ch}
+
+/* ---------- controls ---------- */
+.grp{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.grp:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.grp>h3{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);
+  font-weight:600;margin-bottom:10px}
+.ctl{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;margin-bottom:9px}
+.ctl label{font-size:12.5px;color:var(--ink-2)}
+.ctl output{font-size:12.5px;font-weight:500;color:var(--ink)}
+.ctl input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--accent);margin:1px 0 0;height:18px}
+.ctl select{grid-column:1/-1;width:100%;background:var(--surface-2);color:var(--ink);
+  border:1px solid var(--line);border-radius:4px;padding:5px 7px;font:inherit;font-size:12.5px}
+button{font:inherit;font-weight:600;cursor:pointer;border-radius:4px;border:1px solid var(--line);
+  background:var(--surface-2);color:var(--ink);padding:9px 14px;transition:background .12s,border-color .12s}
+button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] button.primary,
+:root:not([data-theme="light"]) button.primary{color:#15171E}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) button.primary{color:#fff}}
+button.primary:hover{filter:brightness(1.07)}
+button[disabled]{opacity:.5;cursor:progress}
+.rowbtns{display:flex;gap:8px;margin-top:14px}
+.rowbtns button{flex:1}
+
+/* ---------- scenarios ---------- */
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{padding:7px 12px;font-size:13px;font-weight:500}
+.tabs button[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink);font-weight:600}
+.brief{margin-top:16px;padding:14px 16px;background:var(--surface-2);border-left:2px solid var(--accent);border-radius:0 4px 4px 0}
+.brief p{margin:0 0 8px;font-size:13.5px;color:var(--ink-2);max-width:72ch}
+.brief p:last-child{margin-bottom:0}
+.brief .watch{color:var(--ink);font-weight:600}
+
+/* ---------- tiles ---------- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 15px;box-shadow:var(--shadow)}
+.tile .k{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tile .v{font-size:27px;font-weight:700;letter-spacing:-.02em;margin-top:5px;line-height:1.1}
+.tile .n{font-size:12px;color:var(--muted);margin-top:3px}
+.tile.flag{border-color:var(--wall)}
+.tile.flag .v{color:var(--wall)}
+
+/* ---------- charts ---------- */
+.chartbox{overflow-x:auto}
+svg.ascent{display:block;width:100%;height:260px;min-width:520px}
+.tower{display:flex;flex-direction:column-reverse;gap:2px;margin-top:4px}
+.band{display:grid;grid-template-columns:52px 1fr 66px;gap:10px;align-items:center;font-size:12px}
+.band .lab{color:var(--muted);text-align:right}
+.band .track{background:var(--surface-2);border-radius:2px;height:15px;position:relative;overflow:hidden}
+.band .fill{position:absolute;inset:0 auto 0 0;background:var(--ok);border-radius:2px}
+.band.wall .fill{background:var(--wall)}
+.band .amt{color:var(--ink-2)}
+
+/* ---------- tables ---------- */
+table{width:100%;border-collapse:collapse;font-size:13px;color:inherit}
+th{text-align:left;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;padding:0 10px 7px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 10px 7px 0;border-bottom:1px solid var(--line);white-space:nowrap;color:var(--ink)}
+tr:last-child td{border-bottom:0}
+td.num{text-align:right;padding-right:18px}
+th.num{text-align:right;padding-right:18px}
+.zero{color:var(--wall);font-weight:600}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:99px;
+  border:1px solid currentColor}
+.pill.bad{color:var(--wall);background:var(--wall-soft)}
+.pill.good{color:var(--ok)}
+
+/* ---------- findings ---------- */
+.finding{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
+.finding:first-of-type{border-top:0;padding-top:0;margin-top:0}
+.finding h3{font-size:15px;font-weight:600;letter-spacing:-.01em;display:flex;gap:9px;align-items:baseline}
+.finding h3 .tag{font-size:10px;letter-spacing:.11em;text-transform:uppercase;padding:2px 7px;border-radius:2px;
+  background:var(--wall-soft);color:var(--wall);font-weight:700;flex:none}
+.finding h3 .tag.note{background:var(--accent-soft);color:var(--accent)}
+.finding p{margin:7px 0 0;font-size:13.5px;color:var(--ink-2);max-width:74ch}
+pre{background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:14px 16px;
+  overflow-x:auto;font-size:12.5px;line-height:1.6;margin:0}
+.status{font-size:12.5px;color:var(--muted);min-height:18px}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow"><span class="stamp">Throwaway prototype</span><span>dot-tower · ticket 06</span></div>
+  <h1>Progression curve, first pass</h1>
+  <p class="question">A headless model of the idle loop — enemy scaling, climber ranks, gold, locking, prestige, the hero, and the floor respawn timer — so the curve can be <strong>reacted to</strong> rather than argued about. It answers four questions: how long a first run is, where the walls fall, whether run two feels faster, and whether any of it survives floor 1,000. Nothing here is game code; every constant is a slider.</p>
+</header>
+
+<div class="cols">
+  <div class="rail">
+    <div class="card">
+      <h2>Constants</h2>
+      <p class="sub">Move anything, then re-run.</p>
+      <div id="controls"></div>
+      <div class="rowbtns">
+        <button class="primary" id="run">Run simulation</button>
+        <button id="reset">Reset</button>
+      </div>
+      <p class="status mono" id="status"></p>
+    </div>
+  </div>
+
+  <div class="results">
+    <div class="card">
+      <h2>Guided walkthroughs</h2>
+      <p class="sub">Each one sets the constants for a specific question and runs it.</p>
+      <div class="tabs" id="tabs"></div>
+      <div class="brief" id="brief"></div>
+    </div>
+
+    <div class="tiles" id="tiles"></div>
+
+    <div class="card">
+      <h2>The climb</h2>
+      <p class="sub">Floor reached against elapsed time. Vertical ticks are locks.</p>
+      <div class="chartbox"><svg class="ascent" id="ascent" role="img" aria-label="Floor reached over time"></svg></div>
+    </div>
+
+    <div class="card" id="towercard">
+      <h2>Minutes spent per 10 floors</h2>
+      <p class="sub">Read it as the tower. Bars lengthen as the climb slows; a bar past the wall threshold is where the column piles up and dies.</p>
+      <div class="tower" id="tower"></div>
+    </div>
+
+    <div class="card" id="lockcard">
+      <h2>Locks bought</h2>
+      <p class="sub">Sealed income is measured from what the band below the line actually produced in the last 60 seconds, then frozen — ticket 03's rule. A zero means the lock bought no income at all.</p>
+      <div class="chartbox"><table id="locks"></table></div>
+    </div>
+
+    <div class="card" id="campcard">
+      <h2>Runs</h2>
+      <p class="sub">Each row is one run to prestige. <em>Match previous peak</em> is how long the run took to re-reach where the last one stopped — the number that decides whether prestige feels worth it.</p>
+      <div class="chartbox"><table id="camp"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>What the model has already said</h2>
+      <p class="sub">Findings that held across every tuning tried, not artefacts of one slider position.</p>
+      <div id="findings"></div>
+    </div>
+
+    <div class="card">
+      <h2>Constants in shipping shape</h2>
+      <p class="sub">The current slider positions as the RON the game will load and hot-reload.</p>
+      <pre class="mono" id="ron"></pre>
+    </div>
+  </div>
+</div>
+</div>
+
+<script type="module">
+/* ===== the model — lifted verbatim from model.mjs, the liftable half of this prototype ===== */
+/*__MODEL__*/
+
+/* ===== the page — throwaway shell over the model ===== */
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => {
+  if (n == null || !isFinite(n)) return '—';
+  if (Math.abs(n) >= 1e6) return n.toExponential(2).replace('e+', '×10^');
+  if (Math.abs(n) >= 1000) return Math.round(n).toLocaleString();
+  if (Math.abs(n) >= 10) return n.toFixed(0);
+  return n.toFixed(2);
+};
+const mins = (s) => s == null ? '—' : (s / 60).toFixed(0) + ' min';
+
+let cfg = clone(DEFAULTS);
+
+const CONTROLS = [
+  ['The tower', [
+    ['enemyHpBase', 'Enemy HP per floor', 1.02, 1.15, 0.005, (v) => '×' + v.toFixed(3)],
+    ['enemyDpsBase', 'Enemy damage per floor', 1.02, 1.15, 0.005, (v) => '×' + v.toFixed(3)],
+    ['goldBase', 'Gold per kill, per floor', 1.02, 1.20, 0.005, (v) => '×' + v.toFixed(3)],
+    ['packSize', 'Enemies per floor', 1, 10, 1, (v) => v],
+    ['respawnTimer', 'Floor respawn timer', 5, 600, 5, (v) => v + ' s'],
+    ['enemyHp0', 'Enemy health on floor 1', 6, 120, 2, (v) => v + ' hp'],
+  ]],
+  ['Climbers', [
+    ['rankPowerBase', 'Power per rank', 1.05, 1.30, 0.005, (v) => '×' + v.toFixed(3)],
+    ['rankCostBase', 'Cost per rank', 1.05, 1.60, 0.01, (v) => '×' + v.toFixed(2)],
+    ['climbSpeed', 'Climb speed', 0.1, 2, 0.05, (v) => v.toFixed(2) + ' floors/s'],
+    ['spawnInterval', 'Replacement climber every', 1, 12, 0.5, (v) => v.toFixed(1) + ' s'],
+    ['auraFloors', 'Healer aura reach', 0, 4, 1, (v) => '±' + v + ' floors'],
+    ['healerRate', 'Healer rate at rank 1', 0, 8, 0.25, (v) => v.toFixed(2) + ' hp/s'],
+  ]],
+  ['The hero', [
+    ['heroPowerBase', 'Power per hero level', 1.05, 1.40, 0.005, (v) => '×' + v.toFixed(3)],
+    ['heroRespawn', 'Respawn downtime', 2, 120, 1, (v) => v + ' s'],
+    ['heroBelowOffset', 'Floors below the wall', 1, 30, 1, (v) => v],
+    ['heroZone', 'Floors it patrols and holds', 0, 30, 1, (v) => v === 0 ? 'just its own' : '±' + v],
+    ['heroRegenPct', 'Health regenerated', 0, 0.1, 0.005, (v) => (v * 100).toFixed(1) + '% /s'],
+  ]],
+  ['Locking & prestige', [
+    ['lockCostBase', 'Lock cost growth', 1.5, 8, 0.1, (v) => '×' + v.toFixed(1)],
+    ['lockMargin', 'Floors clear before locking', 0, 60, 5, (v) => v],
+    ['prestigeDivisor', 'Prestige divisor', 10, 200, 5, (v) => v],
+    ['prestigeExponent', 'Prestige exponent', 0.5, 2.5, 0.05, (v) => v.toFixed(2)],
+    ['stallMinutes', 'Stalled this long = run over', 2, 20, 1, (v) => v + ' min'],
+  ]],
+];
+
+function buildControls() {
+  const host = $('controls');
+  host.innerHTML = '';
+  for (const [title, rows] of CONTROLS) {
+    const g = document.createElement('div');
+    g.className = 'grp';
+    g.innerHTML = `<h3>${title}</h3>`;
+    for (const [key, label, min, max, step, disp] of rows) {
+      const d = document.createElement('div');
+      d.className = 'ctl';
+      d.innerHTML = `<label for="c-${key}">${label}</label><output class="mono" id="o-${key}"></output>
+        <input type="range" id="c-${key}" min="${min}" max="${max}" step="${step}">`;
+      g.appendChild(d);
+      const input = d.querySelector('input');
+      const get = () => key === 'healerRate' ? cfg.types.healer.heal0
+        : key === 'spawnInterval' ? cfg.types.melee.spawnInterval : cfg[key];
+      const set = (v) => {
+        if (key === 'healerRate') cfg.types.healer.heal0 = v;
+        else if (key === 'spawnInterval') for (const ty of ['melee', 'ranged', 'healer']) cfg.types[ty].spawnInterval = v;
+        else cfg[key] = v;
+      };
+      input.value = get();
+      d.querySelector('output').textContent = disp(get());
+      input.addEventListener('input', () => {
+        set(parseFloat(input.value));
+        d.querySelector('output').textContent = disp(get());
+        renderRon();
+      });
+    }
+    host.appendChild(g);
+  }
+  const g = document.createElement('div');
+  g.className = 'grp';
+  g.innerHTML = `<h3>Rules</h3>
+    <div class="ctl"><label for="c-hero">Hero stationed</label>
+      <select id="c-hero"><option value="wall">At the wall</option><option value="below">Below the wall, farming</option><option value="off">Not stationed</option></select></div>
+    <div class="ctl"><label for="c-prest">Prestige multiplier</label>
+      <select id="c-prest"><option value="compound">Compounds each run</option><option value="bestPeak">Function of best-ever floor</option></select></div>
+    <div class="ctl"><label for="c-policy">Healer targeting</label>
+      <select id="c-policy"><option value="aura">Aura — everyone in radius</option><option value="lowestFraction">One: the lowest percentage</option><option value="lowestAbsolute">One: the lowest raw health</option><option value="nearest">One: the nearest</option></select></div>
+    <div class="ctl"><label for="c-self">Healers may heal themselves</label>
+      <select id="c-self"><option value="yes">Yes</option><option value="no">No</option></select></div>
+    <div class="ctl"><label for="c-hhero">The hero is a heal target</label>
+      <select id="c-hhero"><option value="yes">Yes — no special-casing</option><option value="no">No — climbers only</option></select></div>
+    <div class="ctl"><label for="c-heal">Prestige scales healing</label>
+      <select id="c-heal"><option value="no">No — health and damage only</option><option value="yes">Yes</option></select></div>`;
+  host.appendChild(g);
+  const hero = g.querySelector('#c-hero'), pres = g.querySelector('#c-prest'), heal = g.querySelector('#c-heal');
+  const pol = g.querySelector('#c-policy');
+  hero.value = cfg.heroStation; pres.value = cfg.prestigeMode; heal.value = cfg.healScalesWithPrestige ? 'yes' : 'no';
+  pol.value = cfg.healPolicy;
+  pol.onchange = () => { cfg.healPolicy = pol.value; renderRon(); };
+  const self = g.querySelector('#c-self'), hh = g.querySelector('#c-hhero');
+  self.value = cfg.healSelf ? 'yes' : 'no'; hh.value = cfg.healHero ? 'yes' : 'no';
+  self.onchange = () => { cfg.healSelf = self.value === 'yes'; renderRon(); };
+  hh.onchange = () => { cfg.healHero = hh.value === 'yes'; renderRon(); };
+  hero.onchange = () => { cfg.heroStation = hero.value; renderRon(); };
+  pres.onchange = () => { cfg.prestigeMode = pres.value; renderRon(); };
+  heal.onchange = () => { cfg.healScalesWithPrestige = heal.value === 'yes'; renderRon(); };
+}
+
+/* ---------- scenarios ---------- */
+const SCENARIOS = [
+  {
+    id: 'first', name: 'The first run',
+    brief: `<p>Default constants, one run, from an empty tower to the moment the climb stops moving.</p>
+      <p class="watch">Watch: floors 1–90 go by in under five minutes. The whole first nine locks are a blur, and the game only really begins around floor 100 when the bars start lengthening.</p>`,
+    apply: (c) => c, runs: 1,
+  },
+  {
+    id: 'run2', name: 'Does run two feel faster?',
+    brief: `<p>Three runs back to back, each starting with the multiplier the last one earned.</p>
+      <p class="watch">Watch the <em>match previous peak</em> column. Run two re-reaches run one's ceiling in roughly a third of the time — but that ratio shrinks every run, because the multiplier buys floors logarithmically while floors cost exponentially.</p>`,
+    apply: (c) => c, runs: 3,
+  },
+  {
+    id: 'hero', name: 'The hero throttle',
+    brief: `<p>The same run three times: hero at the wall, hero farming below it, and no hero at all.</p>
+      <p class="watch">Watch how little separates them — then watch the health-on-reaching-the-wall tile, which explains why. Climbers arrive at 100%, so there is no transit damage for a hero to prevent and nothing to escort. Drop the healer rate toward zero and run it again: at 0 hp/s the same three runs read 142, 169 and 128, and stationing suddenly matters.</p>`,
+    apply: (c) => c, runs: 1,
+    compare: { key: 'heroStation', label: 'Hero stationed',
+      values: ['wall', 'below', 'off'], labels: ['At the wall', 'Below the wall', 'Not stationed'] },
+  },
+  {
+    id: 'healing', name: 'Who does the healer heal?',
+    brief: `<p>The same run under four targeting policies. The aura treats everyone in radius at once; the other three commit each healer's whole rate to a single chosen unit.</p>
+      <p class="watch">Watch two things. Single-target healing is a five-fold cut in total sustain, so it is the mildest way to put transit damage back into the game &mdash; climbers reach the wall at 83% rather than 100%. And watch the share of healing going to the hero: <em>lowest percentage</em> sends it 12.5%, while <em>lowest raw health</em> sends it 1.8%, which is the opposite of what ticket 05 predicted.</p>`,
+    apply: (c) => c, runs: 1,
+    compare: { key: 'healPolicy', label: 'Healer targeting',
+      values: ['aura', 'lowestFraction', 'lowestAbsolute', 'nearest'],
+      labels: ['Aura — everyone in radius', 'The lowest percentage', 'The lowest raw health', 'The nearest'] },
+  },
+  {
+    id: 'respawn', name: 'The respawn timer',
+    brief: `<p>The clock on a cleared floor repopulating, swept from 15 seconds to 10 minutes.</p>
+      <p class="watch">Watch it work in two directions at once. A short timer is gold, but respawned floors also re-block the column on its way up from the lock line — so climbers arrive at the wall already bloodied. It is a traffic knob as much as an income knob.</p>`,
+    apply: (c) => c, sweep: { key: 'respawnTimer', values: [15, 45, 120, 600] }, runs: 1,
+  },
+  {
+    id: 'locks', name: 'Locking into dead floors',
+    brief: `<p>One run, with every lock purchase and the income it actually froze.</p>
+      <p class="watch">Watch for the zeros. Ticket 03 says sealed income is measured from the band's real output at lock time — but you only lock floors you have already climbed past, and nothing is earning down there any more. Several locks buy nothing at all.</p>`,
+    apply: (c) => c, runs: 1, focus: 'locks',
+  },
+  {
+    id: 'thousand', name: 'Floor 1,000',
+    brief: `<p>Ten runs, to see whether the curve keeps its shape or falls apart.</p>
+      <p class="watch">Watch two things: floor 1,000 arrives around run ten, roughly twelve hours in — and the prestige multiplier reaches ×10<sup>12</sup> to do it. The curve survives. The number stops meaning anything to a human long before that.</p>`,
+    apply: (c) => c, runs: 10,
+  },
+];
+
+let current = SCENARIOS[0];
+
+function buildTabs() {
+  const host = $('tabs');
+  host.innerHTML = '';
+  for (const s of SCENARIOS) {
+    const b = document.createElement('button');
+    b.textContent = s.name;
+    b.setAttribute('aria-selected', s === current);
+    b.onclick = () => { current = s; buildTabs(); $('brief').innerHTML = s.brief; run(); };
+    host.appendChild(b);
+  }
+  $('brief').innerHTML = current.brief;
+}
+
+/* ---------- running ---------- */
+const SIM = { maxSeconds: 4 * 3600, sampleEvery: 10, dt: 0.2 };
+
+function run() {
+  const btn = $('run');
+  btn.disabled = true;
+  $('status').textContent = 'simulating…';
+  setTimeout(() => {
+    const t0 = performance.now();
+    let out;
+    if (current.compare) {
+      const cmp = current.compare;
+      out = { kind: 'compare', label: cmp.label,
+        rows: cmp.values.map((v, i) => {
+          const c = clone(cfg); c[cmp.key] = v;
+          return { name: cmp.labels[i], r: simulateRun(c, SIM) };
+        }) };
+    } else if (current.sweep) {
+      out = { kind: 'compare', label: 'Respawn timer',
+        rows: current.sweep.values.map((v) => {
+          const c = clone(cfg); c[current.sweep.key] = v;
+          return { name: v + ' s', r: simulateRun(c, SIM) };
+        }) };
+    } else if (current.runs > 1) {
+      out = { kind: 'campaign', rows: simulateCampaign(clone(cfg), current.runs, SIM) };
+    } else {
+      out = { kind: 'single', r: simulateRun(clone(cfg), SIM) };
+    }
+    render(out);
+    $('status').textContent = `done in ${((performance.now() - t0) / 1000).toFixed(1)}s`;
+    btn.disabled = false;
+  }, 20);
+}
+
+/* ---------- rendering ---------- */
+function bandsOf(r) {
+  const first = new Map();
+  for (const s of r.samples) { const b = Math.floor(s.peak / 10) * 10; if (!first.has(b)) first.set(b, s.t); }
+  const arr = [...first.entries()].sort((a, b) => a[0] - b[0]);
+  return arr.map(([floor, t], i) => ({
+    floor, reachedAt: t,
+    dwell: ((i + 1 < arr.length ? arr[i + 1][1] : r.seconds) - t) / 60,
+  }));
+}
+
+function render(out) {
+  const primary = out.kind === 'single' ? out.r : out.kind === 'campaign' ? out.rows[0] : out.rows[0].r;
+  renderTiles(out, primary);
+  renderAscent(out, primary);
+  renderTower(primary);
+  renderLocks(primary);
+  renderTable(out);
+  renderRon();
+}
+
+function renderTiles(out, r) {
+  const b = bandsOf(r);
+  const wallBand = b.find((x) => x.dwell > 3);
+  const t = [];
+  t.push(['First run ends', mins(r.seconds), 'the climb stops moving']);
+  t.push(['Peak floor', r.peak.toLocaleString(), `${r.lockLevel} locks bought`]);
+  t.push(['Wall arrives', wallBand ? String(wallBand.floor) : '—',
+    wallBand ? `floors ${wallBand.floor}–${wallBand.floor + 9} cost ${wallBand.dwell.toFixed(1)} min` : 'no band over 3 min']);
+  t.push(['Climbers lost', r.deaths.toLocaleString(), `${fmt(r.kills)} enemies killed`]);
+  const ss = r.samples.filter((x) => x.t > 600);
+  const wallHp = ss.length ? ss.reduce((a, x) => a + x.wallHp, 0) / ss.length : 1;
+  const totHeal = r.healToHero + r.healToClimbers;
+  if (totHeal > 0) t.push(['Healing spent on the hero', (100 * r.healToHero / totHeal).toFixed(1) + '%', 'the rest went to climbers']);
+  t.push(['Health on reaching the wall', Math.round(wallHp * 100) + '%', wallHp > 0.9 ? 'nothing is lost in transit' : 'the climb itself is costing HP']);
+  if (out.kind === 'campaign') {
+    const last = out.rows[out.rows.length - 1];
+    const r2 = out.rows[1];
+    if (r2) t.push(['Run 2 speed-up', (r.seconds / (r2.secondsToMatchPrevPeak || r.seconds)).toFixed(1) + '×', 'to re-reach run 1’s ceiling']);
+    t.push(['Final floor', last.peak.toLocaleString(), `after ${out.rows.length} runs, ${(out.rows.reduce((a, x) => a + x.seconds, 0) / 3600).toFixed(1)} h`]);
+    t.push(['Final multiplier', '×' + fmt(last.prestigeMultOut), 'worth ' + Math.round(Math.log(last.prestigeMultOut) / Math.log(cfg.enemyHpBase)) + ' floors of head start']);
+  }
+  const zeros = r.events.filter((e) => e.measured === 0).length;
+  if (zeros > 0) t.push({ flag: true, row: ['Locks that bought nothing', zeros + ' of ' + r.events.length, 'measured income was zero'] });
+  $('tiles').innerHTML = t.map((x) => {
+    const flag = x.flag; const [k, v, n] = flag ? x.row : x;
+    return `<div class="tile${flag ? ' flag' : ''}"><div class="k">${k}</div><div class="v mono">${v}</div><div class="n">${n}</div></div>`;
+  }).join('');
+}
+
+function renderAscent(out, primary) {
+  const series = out.kind === 'compare' ? out.rows.map((x) => ({ name: x.name, r: x.r }))
+    : out.kind === 'campaign' ? out.rows.map((r, i) => ({ name: 'Run ' + (i + 1), r }))
+    : [{ name: 'Run 1', r: out.r }];
+  const W = 900, H = 260, P = { l: 52, r: 96, t: 14, b: 30 };
+  let maxT = 0, maxF = 0;
+  for (const s of series) { maxT = Math.max(maxT, s.r.seconds); maxF = Math.max(maxF, s.r.peak); }
+  const x = (t) => P.l + (t / maxT) * (W - P.l - P.r);
+  const y = (f) => H - P.b - (f / maxF) * (H - P.t - P.b);
+  const hues = ['var(--accent)', 'var(--sealed)', 'var(--ok)', 'var(--wall)', 'var(--muted)'];
+  let s = `<g font-family="DM Mono, monospace" font-size="10" fill="var(--muted)">`;
+  for (let i = 0; i <= 4; i++) {
+    const f = Math.round(maxF * i / 4), yy = y(f);
+    s += `<line x1="${P.l}" y1="${yy}" x2="${W - P.r}" y2="${yy}" stroke="var(--line)"/>`;
+    s += `<text x="${P.l - 8}" y="${yy + 3}" text-anchor="end">${f}</text>`;
+  }
+  for (let i = 0; i <= 4; i++) {
+    const t = maxT * i / 4;
+    s += `<text x="${x(t)}" y="${H - 10}" text-anchor="middle">${(t / 60).toFixed(0)}m</text>`;
+  }
+  s += `</g>`;
+  series.forEach((ser, i) => {
+    const pts = ser.r.samples.map((p) => `${x(p.t).toFixed(1)},${y(p.peak).toFixed(1)}`).join(' ');
+    s += `<polyline points="${pts}" fill="none" stroke="${hues[i % hues.length]}" stroke-width="2" stroke-linejoin="round"/>`;
+    if (series.length === 1) {
+      for (const e of ser.r.events) {
+        s += `<line x1="${x(e.t)}" y1="${y(e.floor) - 6}" x2="${x(e.t)}" y2="${y(e.floor) + 6}" stroke="${e.measured === 0 ? 'var(--wall)' : 'var(--sealed)'}" stroke-width="2"/>`;
+      }
+    }
+    s += `<text x="${W - P.r + 8}" y="${y(ser.r.peak) + 4}" font-family="Archivo" font-size="11" font-weight="600" fill="${hues[i % hues.length]}">${ser.name}</text>`;
+  });
+  $('ascent').setAttribute('viewBox', `0 0 ${W} ${H}`);
+  $('ascent').innerHTML = s;
+}
+
+function renderTower(r) {
+  const b = bandsOf(r);
+  const max = Math.max(...b.map((x) => x.dwell), 0.1);
+  $('tower').innerHTML = b.map((x) => `
+    <div class="band${x.dwell > 3 ? ' wall' : ''}">
+      <div class="lab mono">${x.floor}–${x.floor + 9}</div>
+      <div class="track"><div class="fill" style="width:${Math.max(1.5, (x.dwell / max) * 100)}%"></div></div>
+      <div class="amt mono">${x.dwell.toFixed(1)} min</div>
+    </div>`).join('');
+}
+
+function renderLocks(r) {
+  const rows = r.events.filter((e) => e.kind === 'lock');
+  if (!rows.length) { $('locks').innerHTML = '<tr><td>No locks bought.</td></tr>'; return; }
+  $('locks').innerHTML = `<thead><tr><th>Lock</th><th>Bought at</th><th class="num">Income frozen</th><th>Verdict</th></tr></thead><tbody>` +
+    rows.map((e) => `<tr><td class="mono">floor ${e.floor}</td><td class="mono">${(e.t / 60).toFixed(0)} min</td>
+      <td class="num mono ${e.measured === 0 ? 'zero' : ''}">${e.measured === 0 ? '0' : fmt(e.measured) + ' /s'}</td>
+      <td>${e.measured === 0 ? '<span class="pill bad">bought nothing</span>' : '<span class="pill good">earning</span>'}</td></tr>`).join('') + '</tbody>';
+}
+
+function renderTable(out) {
+  const el = $('camp');
+  if (out.kind === 'campaign') {
+    $('campcard').querySelector('h2').textContent = 'Runs';
+    el.innerHTML = `<thead><tr><th>Run</th><th class="num">Length</th><th class="num">Peak floor</th><th class="num">Multiplier going in</th><th class="num">Match previous peak</th><th class="num">Climbers lost</th></tr></thead><tbody>` +
+      out.rows.map((r, i) => `<tr><td class="mono">${i + 1}</td><td class="num mono">${mins(r.seconds)}</td>
+        <td class="num mono">${r.peak.toLocaleString()}</td><td class="num mono">×${fmt(r.prestigeMultIn)}</td>
+        <td class="num mono">${mins(r.secondsToMatchPrevPeak)}</td><td class="num mono">${r.deaths.toLocaleString()}</td></tr>`).join('') + '</tbody>';
+  } else if (out.kind === 'compare') {
+    $('campcard').querySelector('h2').textContent = out.label;
+    el.innerHTML = `<thead><tr><th>${out.label}</th><th class="num">Length</th><th class="num">Peak floor</th><th class="num">Climbers lost</th><th class="num">Gold earned</th><th class="num">Sealed income</th></tr></thead><tbody>` +
+      out.rows.map((x) => `<tr><td>${x.name}</td><td class="num mono">${mins(x.r.seconds)}</td>
+        <td class="num mono">${x.r.peak.toLocaleString()}</td><td class="num mono">${x.r.deaths.toLocaleString()}</td>
+        <td class="num mono">${fmt(x.r.goldEarned)}</td><td class="num mono">${fmt(x.r.sealedRate)} /s</td></tr>`).join('') + '</tbody>';
+  } else {
+    $('campcard').querySelector('h2').textContent = 'Run';
+    const r = out.r;
+    el.innerHTML = `<thead><tr><th class="num">Length</th><th class="num">Peak floor</th><th class="num">Melee rank</th><th class="num">Hero level</th><th class="num">Gold earned</th><th class="num">Multiplier earned</th></tr></thead><tbody>
+      <tr><td class="num mono">${mins(r.seconds)}</td><td class="num mono">${r.peak.toLocaleString()}</td>
+      <td class="num mono">${r.ranks.melee}</td><td class="num mono">${r.heroLevel}</td>
+      <td class="num mono">${fmt(r.goldEarned)}</td><td class="num mono">×${fmt(r.prestigeMultEarned)}</td></tr></tbody>`;
+  }
+}
+
+const FINDINGS = [
+  ['Sealed income is measured after the money has left', 'blocks',
+   'You only lock a floor once you have safely climbed past it, and by then nothing is earning down there. Measuring the last 60 seconds of the sealed band therefore reads close to zero on several purchases, and the player pays thousands of gold for nothing. Ticket 03 settled <em>measure and freeze</em>; the curve says the measurement window is the part that does not work.'],
+  ['The hero is a rounding error', 'blocks',
+   'Forty melee and thirty ranged out-damage a single stationed hero by roughly six to one, and the hero occupies exactly one floor. Stationing it at the wall, below the wall, or not at all moves the peak floor by under 2% — 208 against 205. Hero placement can only be the throttle the map claims if the hero contributes something climbers cannot — abilities, or a floor-wide effect — rather than more damage.'],
+  ['Run length is set by the replacement rate, not the respawn timer', 'note',
+   'Slowing replacement climbers from 2&ndash;3 seconds to 5 cut the first run from 87 minutes to 48 &mdash; the single largest pacing change in the model. Dropping the floor respawn timer from 45 seconds to 20 took only another 12. Sustained throughput is what decides how far the stream gets before the wall stops it, so the spawn interval is the run-length dial and the respawn timer can be chosen on feel.'],
+  ['The respawn timer is a traffic knob, not just an income knob', 'note',
+   'Repopulated floors sit between the lock line and the wall, so a short timer forces every fresh climber to re-fight its way up and arrive at the wall already damaged. Income and attrition move together, in opposite directions. This is the single knob that most directly sets where the wall lands.'],
+  ['As tuned, the wall is declared rather than emergent', 'blocks',
+   'Ticket 05 settled that climbers accumulate damage with no regeneration, so the wall falls out of where the stream\'s surviving health crosses enemy output. At the current healer rate that is not what happens: climbers arrive at the top floor at full health and the wall is a straight power check against the frontier floor, with no attrition in it. Halving the healer rate barely moves it; only removing healers entirely produces a stream that arrives at ~60% and a wall that is genuinely emergent.'],
+  ['Aura reach can be one floor, which dissolves a gap ticket 05 flagged', 'note',
+   'Widening the reach from the healer\'s own floor to &plusmn;3 changes nothing measurable &mdash; 216 / 216 / 216 / 216 under the aura, and noise under single-target &mdash; because combat concentrates every climber on the contested floor, so a wider radius rarely finds anyone new. Ticket 05 raised &ldquo;the aura needs a radius rule in <code>FloorPos</code> space, which is not Euclidean&rdquo; as a real hole in ticket 03\'s coordinate system. Defining reach as <em>the healer\'s own floor</em> closes it for free: no cross-floor distance, no mixing a discrete floor with a normalised x.'],
+  ['The hero costs 13% of all healing and returns nothing', 'blocks',
+   'Ticket 05 keeps the hero in the candidate set with no special-casing, arguing it buys a link between hero placement and climber composition for free. It is not free. Under single-target healing the hero absorbs 13% of every point of healing in the run, and taking it out of the candidate set raises the peak floor from 172 to 178 while pushing melee\'s share from 66% to 76%. The link is real; it just runs the wrong way, because hero uptime is not what is binding.'],
+  ['Ticket 05 has the healer-targeting trap backwards', 'blocks',
+   'That ticket rejects <em>lowest absolute health</em> on the grounds that the hero\'s pool dwarfs a climber\'s, so healers would silently become hero-dedicated. The model says the opposite: a big pool means the hero\'s raw health is usually the <em>highest</em> number in range, so that policy almost never picks it &mdash; 1.8% of all healing, less than the aura\'s own 3.5%. The policy that actually magnetises to the hero is <em>lowest percentage</em>, at 12.5%, because the hero tanks and drops proportionally fastest. The decision to ship the aura still stands; the reasoning recorded under it does not.'],
+  ['Healer rate is the most sensitive constant in the model', 'note',
+   'Reading the aura as a shared pool rather than a per-target rate changed deaths by a factor of ten and moved the peak floor by a third. Ticket 05 settled per-target, stacking linearly — which means the healer is the balance lever the whole curve hangs off, and it wants the tightest tuning of anything here.'],
+  ['A prestige multiplier that does not compound dead-ends', 'note',
+   'Deriving the multiplier from best-ever floor rather than multiplying it each run reaches a fixed point around floor 220 and stops forever — floor buys multiplier buys floor, and the loop closes. Compounding keeps the game alive, at the cost of a multiplier that reads ×10<sup>12</sup> by floor 1,000. Express it to the player as floors of head start, not as a raw number.'],
+  ['The opening is a blur', 'note',
+   'The first ninety floors and nine locks are gone in under five minutes. Everything the game wants to teach — locking, ranks, the wall, the hero — arrives faster than a player can read it. Either the opening slows down, or the tutorial cannot rely on it.'],
+  ['Floor 1,000 holds; double precision runs out around 2,000', 'note',
+   'Gold at floor 1,130 is about 10<sup>46</sup> and the shape of the curve is unchanged. Floats stay honest to roughly floor 2,000, after which gold overflows and the game needs a big-number representation. That is a decision with a deadline, not a crisis.'],
+];
+
+$('findings').innerHTML = FINDINGS.map(([h, tag, p]) =>
+  `<div class="finding"><h3><span class="tag${tag === 'note' ? ' note' : ''}">${tag === 'blocks' ? 'Contradicts the map' : 'Worth knowing'}</span>${h}</h3><p>${p}</p></div>`).join('');
+
+function renderRon() {
+  const c = cfg;
+  $('ron').textContent = `// assets/tuning/progression.ron — hot-reloaded
+(
+    tower: (
+        enemy_hp_base: ${c.enemyHpBase},
+        enemy_hp_floor_1: ${c.enemyHp0},
+        enemy_dps_base: ${c.enemyDpsBase},
+        enemy_dps_floor_1: ${c.enemyDps0},
+        pack_size: ${c.packSize},
+        gold_per_kill_floor_1: ${c.goldPerKill0},
+        gold_base: ${c.goldBase},
+        respawn_timer_secs: ${c.respawnTimer},
+    ),
+    climbers: (
+        rank_power_base: ${c.rankPowerBase},
+        rank_cost_base: ${c.rankCostBase},
+        climb_speed_floors_per_sec: ${c.climbSpeed},
+        aura_reach_floors: ${c.auraFloors},
+        heal_targeting: "${c.healPolicy}",
+        heal_self: ${!!c.healSelf},
+        heal_hero: ${!!c.healHero},
+        types: {
+            "melee":  (hp: ${c.types.melee.hp0}, dps: ${c.types.melee.dps0}, heal: 0.0, cap: ${c.types.melee.cap}, rank_cost_1: ${c.types.melee.rankCost0}, spawn_interval_secs: ${c.types.melee.spawnInterval}, threat: ${c.types.melee.threat}),
+            "ranged": (hp: ${c.types.ranged.hp0}, dps: ${c.types.ranged.dps0}, heal: 0.0, cap: ${c.types.ranged.cap}, rank_cost_1: ${c.types.ranged.rankCost0}, spawn_interval_secs: ${c.types.ranged.spawnInterval}, threat: ${c.types.ranged.threat}),
+            "healer": (hp: ${c.types.healer.hp0}, dps: 0.0, heal: ${c.types.healer.heal0}, cap: ${c.types.healer.cap}, rank_cost_1: ${c.types.healer.rankCost0}, spawn_interval_secs: ${c.types.healer.spawnInterval}, threat: ${c.types.healer.threat}),
+        },
+    ),
+    hero: (
+        hp_level_1: ${c.heroHp0},
+        dps_level_1: ${c.heroDps0},
+        power_base: ${c.heroPowerBase},
+        level_cost_1: ${c.heroCost0},
+        level_cost_base: ${c.heroCostBase},
+        respawn_secs: ${c.heroRespawn},
+        threat: ${c.heroThreat},
+    ),
+    locking: (
+        cost_first: ${c.lockCost0},
+        cost_base: ${c.lockCostBase},
+        floors_per_lock: 10,
+    ),
+    prestige: (
+        divisor: ${c.prestigeDivisor},
+        exponent: ${c.prestigeExponent},
+        compounds: ${c.prestigeMode === 'compound'},
+        scales_healing: ${!!c.healScalesWithPrestige},
+    ),
+)`;
+}
+
+$('run').onclick = run;
+$('reset').onclick = () => { cfg = clone(DEFAULTS); buildControls(); renderRon(); run(); };
+
+buildControls();
+buildTabs();
+renderRon();
+run();
+</script>

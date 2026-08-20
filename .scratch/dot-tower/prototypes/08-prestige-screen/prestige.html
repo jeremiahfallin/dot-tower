@@ -1,0 +1,546 @@
+<meta charset="utf-8">
+<title>Prestige Screen Variants</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap">
+<style>
+/* PROTOTYPE — throwaway. Answers ticket 08 "The prestige before/after screen".
+   Four variants of one screen on one route, switchable via ?variant= and the floating bar.
+   Single-theme by intent: a mock of a dark pixel-art game screen, every colour painted. */
+:root{
+  color-scheme:dark;
+  --page:#0C0E14; --chrome:#161A23; --chrome-2:#1E2430; --line:#2B3242;
+  --ink:#E6E9F2; --ink-2:#A8AFC2; --muted:#767E93;
+  --gold:#E3A63A; --wall:#D9604A; --ok:#7FB061; --aura:#5B7FD4; --xp:#9A6FD0;
+  --tower:#0A0C11; --floor:#131722; --floor-alt:#171C28;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);
+  font-family:Archivo,"Helvetica Neue",Arial,sans-serif;font-size:15px;line-height:1.55}
+.pix{font-family:Silkscreen,"Courier New",monospace;letter-spacing:.02em}
+h1,h2,h3{margin:0;text-wrap:balance}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 24px 150px}
+
+/* ---- prototype chrome (deliberately NOT the design under test) ---- */
+header{border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:24px}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+  font-weight:600;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.eyebrow .stamp{color:var(--wall);border:1px solid currentColor;border-radius:2px;padding:1px 6px}
+h1{font-size:clamp(28px,4vw,42px);font-weight:700;letter-spacing:-.02em;margin-top:12px;line-height:1.05}
+header p{max-width:70ch;color:var(--ink-2);margin:14px 0 0}
+.stage{display:grid;grid-template-columns:minmax(0,390px) minmax(0,1fr);gap:32px;align-items:start}
+@media (max-width:940px){.stage{grid-template-columns:1fr;justify-items:center}}
+.notes h2{font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.notes h3{font-size:20px;font-weight:700;margin:6px 0 10px;letter-spacing:-.01em}
+.notes p{color:var(--ink-2);font-size:14px;margin:0 0 12px;max-width:60ch}
+.notes b{color:var(--ink);font-weight:600}
+.notes .tag{display:inline-block;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  font-weight:700;padding:2px 8px;border-radius:2px;background:var(--chrome-2);color:var(--gold);margin-bottom:10px}
+.ctrls{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);
+  margin-top:18px;padding-top:16px}
+.ctrl{display:flex;flex-direction:column;gap:6px}
+.ctrl .k{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.seg{display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.seg button{background:var(--chrome);border:0;border-right:1px solid var(--line);color:var(--ink-2);
+  font:inherit;font-size:12px;padding:5px 11px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--chrome-2);color:var(--gold);font-weight:600}
+input[type=range]{width:210px;accent-color:var(--gold)}
+.state{margin-top:20px;border-top:1px solid var(--line);padding-top:14px}
+.state h2{margin-bottom:8px}
+.state table{width:100%;border-collapse:collapse;font-size:12.5px}
+.state td{padding:3px 0;color:var(--ink-2)}
+.state td:last-child{text-align:right;color:var(--ink);font-family:Silkscreen,monospace}
+
+/* ---- the phone ---- */
+.phone{width:390px;height:790px;background:var(--tower);border:1px solid var(--line);
+  border-radius:26px;overflow:hidden;position:relative;box-shadow:0 24px 60px -20px #000;flex:none}
+.scene{position:absolute;inset:0;overflow:hidden}
+.rowf{position:absolute;left:0;right:0;height:26px;border-top:1px solid #1B2130;
+  display:flex;align-items:center;padding:0 10px;gap:5px}
+.rowf .num{font-family:Silkscreen,monospace;font-size:9px;color:#4A5266;width:34px;flex:none}
+.dot{width:6px;height:6px;flex:none}
+.dot.melee{background:#C9CFDD}.dot.ranged{background:#7FA8E8}.dot.healer{background:#7FD0A8}
+.dot.enemy{background:#D9604A;width:5px;height:5px}
+.heroSq{width:12px;height:12px;background:var(--gold);flex:none}
+.dim{position:absolute;inset:0;background:rgba(6,8,12,.80)}
+
+/* shared bits */
+.btn{display:block;width:100%;border:0;border-radius:4px;padding:14px;cursor:pointer;
+  font-family:Silkscreen,monospace;font-size:13px;letter-spacing:.04em}
+.btn.go{background:var(--gold);color:#14100A}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink-2);font-size:11px;padding:11px}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:rgba(12,14,20,.97);
+  border-top:1px solid var(--line);padding:14px 16px 20px;z-index:6}
+.k{font-family:Silkscreen,monospace;font-size:7.5px;letter-spacing:.08em;color:var(--muted)}
+.v{font-family:Silkscreen,monospace;font-size:13px;color:var(--ink)}
+.strike{text-decoration:line-through;color:var(--muted)}
+.arrow{color:var(--muted);padding:0 5px}
+
+
+/* ---- variant A: the ledger ---- */
+.ledger{position:absolute;inset:0;background:rgba(9,11,16,.975);padding:22px 18px 0;
+  display:flex;flex-direction:column;z-index:7}
+.ledger .hd{font-family:Silkscreen,monospace;font-size:15px;letter-spacing:.06em;color:var(--gold)}
+.ledger .sub{font-size:12.5px;color:var(--ink-2);margin:6px 0 18px}
+.blk{border:1px solid var(--line);border-radius:4px;margin-bottom:12px}
+.blk>.bh{display:flex;justify-content:space-between;align-items:baseline;padding:8px 11px;
+  border-bottom:1px solid var(--line);background:var(--chrome)}
+.blk>.bh .t{font-family:Silkscreen,monospace;font-size:9.5px;letter-spacing:.1em}
+.blk.lose>.bh .t{color:var(--wall)}.blk.keep>.bh .t{color:var(--ok)}
+.blk .rows{padding:5px 11px 9px}
+.lrow{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;font-size:12.5px;
+  border-bottom:1px solid #171C27}
+.lrow:last-child{border-bottom:0}
+.lrow .n{color:var(--ink-2)}
+.lrow .val{font-family:Silkscreen,monospace;font-size:11px}
+.foot{margin-top:auto;padding:12px 0 18px;border-top:1px solid var(--line)}
+.foot .fnote{font-size:12px;color:var(--ink-2);margin:0 0 11px}
+
+/* ---- variant B: the tower drops ---- */
+.dropband{position:absolute;left:0;right:0;background:linear-gradient(90deg,rgba(227,166,58,.26),rgba(227,166,58,.05));
+  box-shadow:inset 0 0 0 1px rgba(227,166,58,.5);z-index:3;display:flex;align-items:center;justify-content:center}
+.dropband .lbl{font-family:Silkscreen,monospace;font-size:9px;color:var(--gold);text-align:center;line-height:1.5}
+.peakmk{position:absolute;left:0;right:0;height:0;border-top:1px dashed rgba(230,233,242,.55);z-index:4}
+.peakmk .t{position:absolute;right:8px;top:-14px;font-family:Silkscreen,monospace;font-size:8.5px;color:var(--ink-2)}
+.feelmk{position:absolute;left:0;right:0;height:0;border-top:1px solid rgba(227,166,58,.85);z-index:4}
+.feelmk .t{position:absolute;right:8px;top:3px;font-family:Silkscreen,monospace;font-size:8.5px;color:var(--gold)}
+.slide{position:absolute;left:12px;z-index:5;display:flex;flex-direction:column;align-items:center;
+  color:var(--gold);font-family:Silkscreen,monospace;font-size:8px}
+.slide .shaft{width:1px;flex:1;background:var(--gold)}
+.slide .head{width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;
+  border-top:6px solid var(--gold)}
+.costs{position:absolute;left:12px;right:12px;bottom:118px;z-index:6;display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-family:Silkscreen,monospace;font-size:8px;padding:3px 6px;border:1px solid #33283A;
+  color:var(--muted);border-radius:2px}
+.chip b{color:var(--wall);font-weight:400}
+
+/* ---- variant C: two runs ---- */
+.tworuns{position:absolute;inset:0;background:rgba(9,11,16,.975);padding:22px 16px 0;
+  display:flex;flex-direction:column;z-index:7}
+.tworuns .hd{font-family:Silkscreen,monospace;font-size:14px;color:var(--gold);letter-spacing:.06em}
+.tworuns .sub{font-size:12.5px;color:var(--ink-2);margin:6px 0 14px}
+.chartbox{border:1px solid var(--line);border-radius:4px;background:#0B0D13;padding:10px 8px 4px}
+.legend{display:flex;gap:14px;font-family:Silkscreen,monospace;font-size:8px;color:var(--muted);
+  padding:8px 2px 0}
+.legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+.readout{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.card{border:1px solid var(--line);border-radius:4px;padding:9px 10px;background:var(--chrome)}
+.card .k{display:block;margin-bottom:4px}
+.card .v{font-size:15px}
+.resets{margin-top:13px;display:flex;gap:5px;flex-wrap:wrap}
+
+/* ---- variant D: the verdict ---- */
+.verdict{position:absolute;inset:0;background:rgba(9,11,16,.975);padding:26px 20px 0;
+  display:flex;flex-direction:column;z-index:7}
+.verdict .eyeb{font-family:Silkscreen,monospace;font-size:9px;letter-spacing:.14em;color:var(--muted)}
+.verdict .big{font-size:25px;line-height:1.34;font-weight:600;letter-spacing:-.015em;margin:20px 0 0}
+.verdict .big em{font-style:normal;color:var(--gold)}
+.verdict .big s{color:var(--muted);text-decoration:none;display:block;font-size:15px;font-weight:400;
+  margin-top:16px;line-height:1.5}
+.disc{margin-top:auto;border-top:1px solid var(--line)}
+.disc summary{list-style:none;cursor:pointer;padding:13px 0;font-family:Silkscreen,monospace;
+  font-size:9.5px;letter-spacing:.08em;color:var(--muted);display:flex;justify-content:space-between}
+.disc summary::-webkit-details-marker{display:none}
+.disc[open] summary{color:var(--ink-2)}
+.disc .body{padding-bottom:12px;max-height:280px;overflow:auto}
+
+/* ---- moment: after / next run ---- */
+.banner{position:absolute;left:12px;right:12px;bottom:100px;background:rgba(14,17,24,.96);
+  border:1px solid var(--line);border-left:2px solid var(--gold);border-radius:3px;padding:10px 12px;z-index:6}
+.banner .k{display:block;margin-bottom:5px}
+.banner p{margin:0;font-size:12.5px;color:var(--ink-2)}
+.banner b{color:var(--ink);font-weight:600}
+.abar{position:absolute;left:12px;right:12px;bottom:16px;height:70px;display:flex;gap:8px;z-index:5}
+.abtn{flex:1;border:1px solid #333C4E;background:#1B2130;border-radius:4px;display:flex;
+  align-items:center;justify-content:center;font-family:Silkscreen,monospace;font-size:8px;color:var(--muted)}
+
+/* ---- floating switcher (prototype chrome) ---- */
+.sw{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:flex;align-items:stretch;
+  background:#F2F4F8;color:#0C0E14;border-radius:999px;box-shadow:0 12px 34px -8px rgba(0,0,0,.8);z-index:99}
+.sw button{background:transparent;border:0;font:inherit;font-size:17px;padding:0 17px;cursor:pointer;color:#0C0E14}
+.sw .lbl{padding:9px 12px;font-family:Silkscreen,monospace;font-size:11px;white-space:nowrap;
+  border-left:1px solid #C9CFDB;border-right:1px solid #C9CFDB;display:flex;align-items:center;gap:8px}
+.sw .lbl small{font-family:Archivo,sans-serif;font-size:12px;color:#4A5266}
+</style>
+<style>
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.sw button:focus-visible{outline-offset:-4px;border-radius:999px}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow"><span class="stamp">Prototype — throwaway</span><span>Ticket 08 · the prestige before/after screen</span></div>
+  <h1>What does the player see when they prestige?</h1>
+  <p>Four variants of one screen, switchable via <code>?variant=</code> and the bar at the bottom. Every number is real:
+  the runs come from ticket 06's model (<code>prototypes/06-progression-curve/model.mjs</code>) run as a seven-run campaign with
+  the ticket-16 hero — ×2 aura, taunting, stationed at the wall. The projected next run is the <em>measured</em> next run,
+  not an invented curve. Use the controls to move between the first prestige and a mature account, and between the three
+  moments the screen could occupy.</p>
+</header>
+
+<div class="stage">
+  <div class="phone"><div class="scene" id="scene"></div><div id="overlay"></div></div>
+
+  <div class="notes">
+    <span class="tag" id="vtag"></span>
+    <h2>Variant</h2>
+    <h3 id="vname"></h3>
+    <div id="vbody"></div>
+
+    <div class="ctrls">
+      <div class="ctrl"><span class="k">Account state</span>
+        <div class="seg" id="segRun">
+          <button data-run="1">1st prestige</button>
+          <button data-run="2">2nd</button>
+          <button data-run="5">Mature (6th)</button>
+        </div></div>
+      <div class="ctrl"><span class="k">Moment</span>
+        <div class="seg" id="segMoment">
+          <button data-moment="preview">Before committing</button>
+          <button data-moment="after">Just after</button>
+          <button data-moment="next">Next run</button>
+        </div></div>
+      <div class="ctrl"><span class="k">Prestige at floor <b id="peakLbl"></b></span>
+        <input type="range" id="peak" min="20" max="900" step="1">
+      </div>
+    </div>
+
+    <div class="state"><h2>State</h2><table id="statetbl"></table></div>
+  </div>
+</div>
+</div>
+
+<div class="sw">
+  <button id="prev" aria-label="previous variant">←</button>
+  <div class="lbl" id="swlbl"></div>
+  <button id="next" aria-label="next variant">→</button>
+</div>
+
+<script>
+// ---------- measured data (ticket 06 model, 7-run campaign, ×2 taunting hero at the wall) ----------
+const RUNS = {"1":{"peak":147,"min":41.4,"gold":36751632.975380324,"ranks":{"melee":56,"ranged":54,"healer":54},"heroLevel":50,"lock":9,"Min":1,"Mout":5.1832,"match":null,"last10":7,"pts":[[0.2,2],[1.2,19],[2.2,35],[3.2,47],[4.2,64],[5.2,79],[6.2,91],[7.2,101],[8.2,101],[9.2,101],[10.2,101],[11.2,104],[12.2,108],[13.2,111],[14.2,112],[15.2,117],[16.2,117],[17.2,119],[18.2,119],[19.2,119],[20.2,121],[21.2,124],[22.3,125],[23.3,128],[24.3,134],[25.3,134],[26.3,134],[27.3,134],[28.3,134],[29.3,135],[30.3,137],[31.3,140],[32.4,140],[33.4,140],[34.4,140],[35.4,147],[36.4,147],[37.4,147],[38.4,147],[39.4,147],[40.4,147],[41.4,147]]},"2":{"peak":206,"min":47.6,"gold":3346227169.3417,"ranks":{"melee":76,"ranged":75,"healer":74},"heroLevel":71,"lock":13,"Min":5.1832,"Mout":36.7891,"match":10.7,"last10":3,"pts":[[0.2,4],[1.2,28],[2.2,52],[3.2,73],[4.2,86],[5.2,109],[6.2,127],[7.2,131],[8.2,131],[9.2,139],[10.2,146],[11.2,152],[12.2,153],[13.2,153],[14.2,156],[15.2,167],[16.2,173],[17.2,173],[18.2,173],[19.2,173],[20.2,173],[21.2,177],[22.3,177],[23.3,177],[24.3,177],[25.3,179],[26.3,187],[27.3,187],[28.3,187],[29.3,187],[30.3,187],[31.3,187],[32.4,191],[33.4,191],[34.4,191],[35.4,194],[36.4,203],[37.4,203],[38.4,203],[39.4,203],[40.4,203],[41.4,205],[42.5,206],[43.5,206],[44.5,206],[45.5,206],[46.5,206],[47.5,206],[47.6,206]]},"3":{"peak":311,"min":103.8,"gold":248722350180986.6,"ranks":{"melee":116,"ranged":115,"healer":114},"heroLevel":111,"lock":20,"Min":36.7891,"Mout":394.4247,"match":11.7,"last10":3,"pts":[[0.2,5],[1.2,34],[2.2,62],[3.2,90],[4.2,116],[5.2,129],[6.2,155],[7.2,179],[8.2,179],[9.2,185],[10.2,196],[11.2,197],[12.2,214],[13.2,215],[14.2,224],[15.2,224],[16.2,227],[17.2,232],[18.2,243],[19.2,243],[20.2,246],[21.2,246],[22.3,249],[23.3,249],[24.3,259],[25.3,259],[26.3,259],[27.3,259],[28.3,259],[29.3,264],[30.3,264],[31.3,264],[32.4,264],[33.4,266],[34.4,267],[35.4,270],[36.4,270],[37.4,272],[38.4,274],[39.4,276],[40.4,277],[41.4,277],[42.5,278],[43.5,278],[44.5,281],[45.5,281],[46.5,281],[47.5,284],[48.5,284],[49.5,284],[50.5,284],[51.5,284],[52.6,286],[53.6,286],[54.6,288],[55.6,289],[56.6,289],[57.6,289],[58.6,289],[59.6,291],[60.6,291],[61.6,293],[62.7,293],[63.7,293],[64.7,293],[65.7,293],[66.7,296],[67.7,296],[68.7,296],[69.7,296],[70.7,296],[71.7,299],[72.7,299],[73.7,299],[74.7,300],[75.7,300],[76.7,300],[77.7,300],[78.7,302],[79.7,302],[80.7,303],[81.7,303],[82.7,303],[83.7,304],[84.7,304],[85.7,305],[86.7,305],[87.7,305],[88.7,305],[89.7,305],[90.7,308],[91.7,308],[92.7,308],[93.7,308],[94.7,308],[95.7,309],[96.7,309],[97.7,310],[98.7,311],[99.7,311],[100.7,311],[101.7,311],[102.7,311],[103.7,311],[103.8,311]]},"5":{"peak":613,"min":142,"gold":5.469107161631807e+25,"ranks":{"melee":219,"ranged":217,"healer":217},"heroLevel":213,"lock":39,"Min":6146.3368,"Mout":136668.5489,"match":20.6,"last10":3,"pts":[[0.2,5],[1.2,35],[2.2,65],[3.2,95],[4.2,126],[5.2,156],[6.2,186],[7.2,213],[8.2,238],[9.2,268],[10.2,297],[11.2,325],[12.2,339],[13.2,339],[14.2,354],[15.2,380],[16.2,403],[17.2,404],[18.2,404],[19.2,417],[20.2,438],[21.2,446],[22.3,446],[23.3,446],[24.3,462],[25.3,475],[26.3,475],[27.3,475],[28.3,491],[29.3,496],[30.3,496],[31.3,496],[32.4,505],[33.4,512],[34.4,512],[35.4,512],[36.4,514],[37.4,524],[38.4,524],[39.4,524],[40.4,524],[41.4,533],[42.5,533],[43.5,533],[44.5,533],[45.5,540],[46.5,542],[47.5,542],[48.5,542],[49.5,548],[50.5,548],[51.5,548],[52.6,550],[53.6,555],[54.6,555],[55.6,555],[56.6,557],[57.6,559],[58.6,559],[59.6,559],[60.6,564],[61.6,564],[62.7,564],[63.7,564],[64.7,568],[65.7,568],[66.7,568],[67.7,568],[68.7,573],[69.7,573],[70.7,573],[71.7,573],[72.7,576],[73.7,576],[74.7,576],[75.7,576],[76.7,579],[77.7,579],[78.7,579],[79.7,579],[80.7,582],[81.7,582],[82.7,582],[83.7,582],[84.7,586],[85.7,586],[86.7,586],[87.7,586],[88.7,588],[89.7,588],[90.7,588],[91.7,588],[92.7,591],[93.7,591],[94.7,591],[95.7,591],[96.7,593],[97.7,593],[98.7,593],[99.7,593],[100.7,595],[101.7,595],[102.7,595],[103.7,595],[104.7,597],[105.7,597],[106.7,597],[107.7,598],[108.7,600],[109.7,600],[110.7,600],[111.7,600],[112.7,602],[113.7,602],[114.7,602],[115.7,602],[116.7,603],[117.7,603],[118.7,603],[119.7,603],[120.7,606],[121.7,606],[122.7,606],[123.7,606],[124.7,607],[125.7,607],[126.7,607],[127.7,607],[128.7,609],[129.7,609],[130.7,609],[131.7,609],[132.7,610],[133.7,610],[134.7,610],[135.7,610],[136.7,613],[137.7,613],[138.7,613],[139.7,613],[140.7,613],[141.7,613],[142,613]]},"6":{"peak":827,"min":215.3,"gold":2.4755876217012833e+34,"ranks":{"melee":293,"ranged":292,"healer":291},"heroLevel":288,"lock":54,"Min":136668.5489,"Mout":4251127.1041,"match":27.1,"last10":1,"pts":[[0.2,5],[1.2,35],[2.2,65],[3.2,95],[4.2,126],[5.2,156],[6.2,186],[7.2,216],[8.2,246],[9.2,276],[10.2,298],[11.2,328],[12.2,358],[13.2,388],[14.2,418],[15.2,448],[16.2,471],[17.2,472],[18.2,472],[19.2,500],[20.2,528],[21.2,555],[22.3,560],[23.3,560],[24.3,560],[25.3,571],[26.3,595],[27.3,617],[28.3,617],[29.3,617],[30.3,617],[31.3,635],[32.4,653],[33.4,656],[34.4,656],[35.4,656],[36.4,666],[37.4,682],[38.4,684],[39.4,684],[40.4,684],[41.4,689],[42.5,702],[43.5,702],[44.5,702],[45.5,702],[46.5,702],[47.5,711],[48.5,717],[49.5,717],[50.5,717],[51.5,717],[52.6,727],[53.6,729],[54.6,729],[55.6,729],[56.6,729],[57.6,733],[58.6,738],[59.6,738],[60.6,738],[61.6,738],[62.7,746],[63.7,746],[64.7,746],[65.7,746],[66.7,749],[67.7,753],[68.7,753],[69.7,753],[70.7,753],[71.7,757],[72.7,758],[73.7,758],[74.7,758],[75.7,758],[76.7,761],[77.7,764],[78.7,764],[79.7,764],[80.7,764],[81.7,766],[82.7,769],[83.7,769],[84.7,769],[85.7,769],[86.7,773],[87.7,773],[88.7,773],[89.7,773],[90.7,773],[91.7,777],[92.7,777],[93.7,777],[94.7,777],[95.7,777],[96.7,781],[97.7,781],[98.7,781],[99.7,781],[100.7,781],[101.7,784],[102.7,784],[103.7,784],[104.7,784],[105.7,784],[106.7,787],[107.7,787],[108.7,787],[109.7,787],[110.7,789],[111.7,790],[112.7,790],[113.7,790],[114.7,790],[115.7,793],[116.7,793],[117.7,793],[118.7,793],[119.7,793],[120.7,796],[121.7,796],[122.7,796],[123.7,796],[124.7,796],[125.7,797],[126.7,798],[127.7,798],[128.7,798],[129.7,798],[130.7,800],[131.7,800],[132.7,800],[133.7,800],[134.7,800],[135.7,802],[136.7,802],[137.7,802],[138.7,802],[139.7,802],[140.7,805],[141.7,805],[142.7,805],[143.7,805],[144.7,805],[145.7,806],[146.7,806],[147.7,806],[148.7,806],[149.7,807],[150.7,809],[151.7,809],[152.7,809],[153.7,809],[154.7,809],[155.7,811],[156.7,811],[157.7,811],[158.7,811],[159.7,811],[160.7,812],[161.7,812],[162.7,812],[163.7,812],[164.7,814],[165.7,814],[166.7,814],[167.7,814],[168.7,814],[169.7,815],[170.7,815],[171.7,815],[172.7,815],[173.7,815],[174.7,817],[175.7,817],[176.7,817],[177.7,817],[178.7,817],[179.7,818],[180.7,818],[181.7,818],[182.7,818],[183.7,818],[184.7,820],[185.7,820],[186.7,820],[187.7,820],[188.7,820],[189.7,821],[190.7,821],[191.7,821],[192.7,821],[193.7,821],[194.7,823],[195.7,823],[196.7,823],[197.7,823],[198.7,823],[199.7,824],[200.7,824],[201.7,824],[202.7,824],[203.7,824],[204.7,826],[205.7,826],[206.7,826],[207.7,826],[208.7,826],[209.7,827],[210.7,827],[211.7,827],[212.7,827],[213.7,827],[214.7,827],[215.3,827]]}};
+const HP_BASE = 1.075;                     // enemy health per floor -- the exchange rate
+const M_of  = (peak) => Math.pow(1 + peak / 50, 1.2);
+const hs    = (M) => Math.log(M) / Math.log(HP_BASE);     // multiplier -> floors of head start
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+
+// gold, in the compact notation an idle game has to use eventually
+const SUF = ['','k','m','b','t','q','Q','s','S','o','n','d'];
+function gold(n){
+  if (n < 1000) return Math.round(n).toString();
+  const e = Math.floor(Math.log10(n) / 3);
+  return (n / Math.pow(1000, e)).toFixed(2) + SUF[e];
+}
+const mins = (m) => m == null ? 'never' : m < 1 ? Math.round(m*60)+'s' : m < 10 ? (+m.toFixed(1))+' min' : m < 60 ? Math.round(m)+' min'
+  : Math.floor(m/60)+'h ' + Math.round(m%60) + 'm';
+
+// when does the NEXT run cross floor f? measured, by walking its curve.
+function crossing(runNo, f){
+  const nxt = RUNS[runNo + 1];
+  if (!nxt) return null;
+  const p = nxt.pts;
+  for (let i = 1; i < p.length; i++){
+    if (p[i][1] >= f){
+      const [t0,f0] = p[i-1], [t1,f1] = p[i];
+      return f1 === f0 ? t1 : t0 + (t1 - t0) * (f - f0) / (f1 - f0);
+    }
+  }
+  return null;                              // next run never got there
+}
+
+// ---------- derived state ----------
+let variant = new URL(location).searchParams.get('variant') || 'A';
+let runNo = 1, moment = 'preview', peak = null;
+
+function D(){
+  const r = RUNS[runNo];
+  const p = peak ?? r.peak;
+  const earned = M_of(p), Min = r.Min, Mout = Min * earned;
+  const hsIn = hs(Min), hsOut = hs(Mout), gain = hsOut - hsIn;
+  // marginal: what one more floor of climbing is worth, against what it costs
+  const dHs = 1.2 / ((50 + p) * Math.log(HP_BASE));
+  const minPerFloor = r.last10 ? 10 / r.last10 : 10;
+  const back = crossing(runNo, p);
+  return { r, p, earned, Min, Mout, hsIn, hsOut, gain, dHs, minPerFloor, back,
+    ranksLost: r.ranks, gLost: r.gold, lockLost: r.lock, heroLost: r.heroLevel,
+    thisRunMin: r.min };
+}
+</script>
+
+<script>
+const el = (tag, cls, txt) => { const d = document.createElement(tag); if (cls) d.className = cls;
+  if (txt != null) d.textContent = txt; return d; };
+const FH = 26, VIEW = 31;
+
+// ---------- the tower behind everything ----------
+// Returns yOf(floor) in phone pixels, so the diegetic variant can hang things off real floors.
+function renderScene(topFloor){
+  const s = document.getElementById('scene');
+  s.innerHTML = '';
+  const yOf = (f) => (topFloor - f) * FH;
+  for (let i = 0; i < VIEW; i++){
+    const f = topFloor - i;
+    if (f < 1) break;
+    const row = el('div','rowf');
+    row.style.top = (i * FH) + 'px';
+    row.style.background = f % 2 ? 'var(--floor)' : 'var(--floor-alt)';
+    row.appendChild(el('div','num pix', String(f)));
+    const dense = f <= (peak ?? RUNS[runNo].peak);
+    for (let e = 0; e < (dense ? 3 : 4); e++) row.appendChild(el('div','dot enemy'));
+    if (dense) for (let c = 0; c < 5; c++)
+      row.appendChild(el('div','dot ' + ['melee','ranged','melee','healer','ranged'][c]));
+    s.appendChild(row);
+  }
+  return yOf;
+}
+
+// ---------- shared fragments ----------
+function loseRows(d){
+  return [
+    ['Gold', gold(d.gLost), '0'],
+    ['Peak floor', d.p, '1'],
+    ['Locks', d.lockLost + ' × 10 floors', 'none'],
+    ['Melee rank', d.ranksLost.melee, '1'],
+    ['Ranged rank', d.ranksLost.ranged, '1'],
+    ['Healer rank', d.ranksLost.healer, '1'],
+    ['Hero level', d.heroLost, '1'],
+  ].map(([n,a,b]) => `<div class="lrow"><span class="n">${n}</span>
+      <span class="val"><span class="strike">${a}</span><span class="arrow">→</span>${b}</span></div>`).join('');
+}
+function keepRows(d){
+  return [
+    ['Head start', d.hsIn.toFixed(0) + ' floors', d.hsOut.toFixed(0) + ' floors'],
+    ['Relics', '3', '3'],
+  ].map(([n,a,b]) => `<div class="lrow"><span class="n">${n}</span>
+      <span class="val">${a}<span class="arrow">→</span><span style="color:var(--ok)">${b}</span></span></div>`).join('');
+}
+const costChips = (d) => [
+  `${gold(d.gLost)} gold`, `floor ${d.p}`, `${d.lockLost} locks`,
+  `ranks ${d.ranksLost.melee}/${d.ranksLost.ranged}/${d.ranksLost.healer}`, `hero lv ${d.heroLost}`
+].map(t => `<span class="chip"><b>−</b> ${t}</span>`).join('');
+
+function chart(d, {actualTo = null} = {}){
+  const cur = d.r.pts, nxt = RUNS[runNo + 1] ? RUNS[runNo + 1].pts : [];
+  const W = 340, H = 150, PL = 30, PB = 16;
+  const Tmax = Math.max(d.r.min, nxt.length ? nxt[nxt.length-1][0] : 0);
+  const Fmax = Math.max(d.p, nxt.length ? nxt[nxt.length-1][1] : 0) * 1.05;
+  const X = (t) => PL + (t / Tmax) * (W - PL - 6);
+  const Y = (f) => (H - PB) - (f / Fmax) * (H - PB - 8);
+  const path = (pts) => pts.map(([t,f],i) => (i?'L':'M') + X(t).toFixed(1) + ' ' + Y(f).toFixed(1)).join(' ');
+  const cross = d.back;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">
+    <line x1="${PL}" y1="${Y(d.p)}" x2="${W-6}" y2="${Y(d.p)}" stroke="#2B3242" stroke-dasharray="2 3"/>
+    <text x="2" y="${Y(d.p)+3}" fill="#767E93" font-family="Silkscreen,monospace" font-size="7">F${d.p}</text>
+    <text x="2" y="${H-PB+3}" fill="#767E93" font-family="Silkscreen,monospace" font-size="7">F0</text>
+    ${nxt.length ? `<path d="${path(nxt)}" fill="none" stroke="#E3A63A" stroke-width="1.5" stroke-dasharray="3 3"/>` : ''}
+    <path d="${path(cur)}" fill="none" stroke="#A8AFC2" stroke-width="1.5"/>
+    ${actualTo != null && nxt.length ? `<path d="${path(nxt.filter(p=>p[0]<=actualTo))}" fill="none" stroke="#7FB061" stroke-width="2"/>` : ''}
+    ${cross != null ? `<circle cx="${X(cross)}" cy="${Y(d.p)}" r="3.5" fill="#E3A63A"/>
+      <text x="${X(cross)+6}" y="${Y(d.p)-6}" fill="#E3A63A" font-family="Silkscreen,monospace" font-size="8">${mins(cross)}</text>` : ''}
+    <circle cx="${X(d.r.min)}" cy="${Y(d.p)}" r="3" fill="#A8AFC2"/>
+    <text x="${X(d.r.min)-4}" y="${Y(d.p)-6}" fill="#A8AFC2" text-anchor="end" font-family="Silkscreen,monospace" font-size="8">${mins(d.r.min)}</text>
+  </svg>
+  <div class="legend"><span><i style="border-color:#A8AFC2"></i>this run</span>
+    <span><i style="border-color:#E3A63A;border-top-style:dashed"></i>next run${actualTo!=null?' (projected)':''}</span>
+    ${actualTo!=null?'<span><i style="border-color:#7FB061"></i>actually happened</span>':''}</div>`;
+}
+</script>
+
+<script>
+const ABAR = `<div class="abar">${['STRIKE','RALLY','GUARD','WARCRY']
+  .map(n=>`<div class="abtn">${n}</div>`).join('')}</div>`;
+
+const VARIANTS = {
+
+A: { name:'The ledger', tag:'Itemised · no recommendation',
+  body:`<p>A full-screen modal that lists <b>every</b> line that changes, struck-through old value beside new,
+    losses first and gains second. No verdict, no persuasion — the player adds it up.</p>
+  <p>Answers ticket 08's Q1 and Q3 completely and Q2 by being a preview. Its risk is the one the reference
+    game has: a wall of numbers <em>is</em> the illegibility, and the single line that matters (head start)
+    is buried among six that don't.</p>`,
+  top:(d)=> d.p + 3,
+  render(d){
+    if (moment === 'next') return `${ABAR}<div class="banner"><span class="k">PRESTIGE 1 · SETTLED</span>
+      <p>Back at floor <b>${d.p}</b>. That took <b>${mins(d.thisRunMin)}</b> last run and
+      <b>${mins(d.back)}</b> this one. Ranks are at ${RUNS[runNo+1]?'~'+Math.round(d.ranksLost.melee*0.6):'—'} and climbing.</p></div>`;
+    const done = moment === 'after';
+    return `<div class="dim"></div><div class="ledger">
+      <div class="hd">${done ? 'PRESTIGE COMPLETE' : 'PRESTIGE'}</div>
+      <div class="sub">${done ? 'The run is over. Here is what it bought.'
+        : 'Everything in the first block resets. The second block is what carries.'}</div>
+      <div class="blk lose"><div class="bh"><span class="t">${done?'GAVE UP':'YOU GIVE UP'}</span>
+        <span class="k">RUN ${runNo} · ${mins(d.thisRunMin).toUpperCase()}</span></div>
+        <div class="rows">${loseRows(d)}</div></div>
+      <div class="blk keep"><div class="bh"><span class="t">${done?'KEPT':'YOU KEEP'}</span>
+        <span class="k">+${d.gain.toFixed(0)} FLOORS</span></div>
+        <div class="rows">${keepRows(d)}</div></div>
+      <div class="foot"><p class="fnote">Every floor in the tower is now <b>${d.gain.toFixed(0)} floors</b> easier.
+        ${d.back!=null?`You should be back at floor ${d.p} in about <b>${mins(d.back)}</b>.`:''}</p>
+        <button class="btn go">${done?'CONTINUE':'PRESTIGE'}</button>
+        ${done?'':'<div style="height:8px"></div><button class="btn ghost">KEEP CLIMBING</button>'}</div>
+    </div>`;
+  }},
+
+B: { name:'The tower drops', tag:'Diegetic · no modal',
+  body:`<p>No screen at all. The comparison is drawn <b>on the tower</b>: a lit band showing how far every floor
+    slides down, an exact statement of what that means, and your old peak marked where you left it.
+    The only chrome is a sheet with the costs and the button.</p>
+  <p>Rests on one fact that is precisely, not approximately, true: with head start <em>h</em>, floor <em>f</em>
+    next run fights exactly like floor <em>f−h</em> did. The multiplier never appears anywhere.
+    Consistent with ticket 09's split — spatial things live in the tower.</p>`,
+  top:(d)=> moment === 'after' ? 30 : d.p + 3,
+  render(d){
+    const yOf = window.__yOf;
+    if (moment === 'after'){
+      const h = Math.min(d.gain, 29) * FH;
+      return `<div class="dropband" style="top:${yOf(Math.round(d.gain))}px;height:${h}px">
+          <div class="lbl">${d.gain.toFixed(0)} FLOORS<br>ALREADY PAID FOR<br>
+          <span style="color:var(--muted)">THESE FIGHT LIKE<br>FLOOR 1 DID LAST RUN</span></div></div>${ABAR}`;
+    }
+    if (moment === 'next'){
+      return `<div class="peakmk" style="top:${yOf(d.p)}px"><span class="t">
+        YOU WERE HERE · ${mins(d.thisRunMin).toUpperCase()}</span></div>
+        <div class="feelmk" style="top:${yOf(d.p)+2}px"><span class="t">
+        BACK IN ${mins(d.back).toUpperCase()}</span></div>${ABAR}`;
+    }
+    const bandTop = yOf(d.p), bandH = Math.min(d.gain * FH, 560);
+    return `
+      <div class="peakmk" style="top:${bandTop}px"><span class="t">YOU ARE HERE · FLOOR ${d.p}</span></div>
+      <div class="dropband" style="top:${bandTop}px;height:${bandH}px">
+        <div class="lbl">EVERY FLOOR<br>DROPS ${d.gain.toFixed(0)}<br>
+        <span style="color:var(--ink-2)">FLOOR ${d.p} WILL FIGHT<br>LIKE FLOOR ${Math.round(d.p-d.gain)}</span></div></div>
+      <div class="feelmk" style="top:${bandTop + bandH}px"><span class="t">FLOOR ${Math.round(d.p-d.gain)}</span></div>
+      <div class="sheet">
+        <div class="costs" style="position:static;margin-bottom:11px">${costChips(d)}</div>
+        <button class="btn go">PRESTIGE</button>
+        <div style="height:8px"></div><button class="btn ghost">KEEP CLIMBING</button></div>`;
+  }},
+
+C: { name:'Two runs',  tag:'Time axis · shows the stall',
+  body:`<p>Reframes the comparison from <em>state before / state after</em> to <em>this run / next run</em>, on
+    a floors-against-minutes chart. The grey line is the run just played; the dashed gold line is the next one.</p>
+  <p>The argument for prestiging is the <b>flat tail</b> of the grey line — the player sees they have stopped
+    climbing rather than being told. And it is the only variant that answers Q4 for free: next run the same
+    chart draws the real line over the projection, so "was it worth it" is a picture, not a memory.</p>`,
+  top:(d)=> d.p + 3,
+  render(d){
+    if (moment === 'next') return `${ABAR}<div class="banner" style="bottom:96px">
+      <span class="k">RUN ${runNo+1} · VS THE PROMISE</span>
+      <div class="chartbox" style="margin:6px 0 8px">${chart(d,{actualTo:d.back})}</div>
+      <p>Promised floor ${d.p} in <b>${mins(d.back)}</b>. Got there in <b>${mins(d.back)}</b>.</p></div>`;
+    const done = moment === 'after';
+    return `<div class="dim"></div><div class="tworuns">
+      <div class="hd">${done ? 'RUN ' + (runNo+1) + ' BEGINS' : 'PRESTIGE?'}</div>
+      <div class="sub">${done ? 'The grey line is the run you just finished.'
+        : 'You stopped climbing ' + mins(d.thisRunMin - 10) + ' in. The dashed line is what next run looks like.'}</div>
+      <div class="chartbox">${chart(d)}</div>
+      <div class="readout">
+        <div class="card"><span class="k">BACK TO FLOOR ${d.p}</span>
+          <span class="v" style="color:var(--gold)">${d.back!=null?mins(d.back):'—'}</span>
+          <span class="k" style="margin-top:4px">TOOK ${mins(d.thisRunMin).toUpperCase()} THIS RUN</span></div>
+        <div class="card"><span class="k">THEN ONWARD TO</span>
+          <span class="v" style="color:var(--ok)">FLOOR ${RUNS[runNo+1]?RUNS[runNo+1].peak:'—'}</span>
+          <span class="k" style="margin-top:4px">+${RUNS[runNo+1]?RUNS[runNo+1].peak-d.p:'—'} NEW FLOORS</span></div>
+      </div>
+      <div class="resets">${costChips(d)}</div>
+      <div class="foot" style="border:0;padding-top:14px">
+        <button class="btn go">${done?'CONTINUE':'PRESTIGE'}</button>
+        ${done?'':'<div style="height:8px"></div><button class="btn ghost">KEEP CLIMBING</button>'}</div>
+    </div>`;
+  }},
+
+D: { name:'The verdict', tag:'One sentence · details collapsed',
+  body:`<p>Almost nothing on screen. One sentence in plain language, priced in <b>minutes</b> rather than in units
+    lost, and the full ledger folded behind a disclosure for the player who wants it.</p>
+  <p>Takes the strongest position: that the honest answer to "what did that buy me" is a <em>time</em>, and that
+    quoting the cost as "rank 56 → rank 1" makes prestige feel punishing for no informational gain, because the
+    ranks come back in ten minutes. Its risk is paternalism — the player is being told what to think.</p>`,
+  top:(d)=> moment === 'after' ? 30 : d.p + 3,
+  render(d){
+    if (moment === 'next') return `${ABAR}<div class="banner">
+      <span class="k">FLOOR ${d.p} · AGAIN</span>
+      <p>Last run this floor took <b>${mins(d.thisRunMin)}</b>. This run it took <b>${mins(d.back)}</b>.</p></div>`;
+    if (moment === 'after') return `<div class="dim"></div><div class="verdict">
+      <div class="eyeb">RUN ${runNo+1}</div>
+      <p class="big">Every floor in the tower just got <em>${d.gain.toFixed(0)} floors</em> easier.
+        <s>Floor ${d.p} will fight like floor ${Math.round(d.p-d.gain)} did. You should be back there in
+        about ${mins(d.back)}.</s></p>
+      <div class="foot" style="margin-top:auto;border:0"><button class="btn go">CLIMB</button></div></div>`;
+    const ten = 10 * d.minPerFloor, tenHs = 10 * d.dHs;
+    return `<div class="dim"></div><div class="verdict">
+      <div class="eyeb">PRESTIGE?</div>
+      <p class="big">You've climbed <em>${d.r.last10} floors</em> in the last ten minutes.
+        Prestige now and you'll be back here in about <em>${d.back!=null?mins(d.back):'—'}</em>.
+        <s>Ten more floors would take about ${mins(ten)} and add
+        ${tenHs < 1 ? 'less than one floor' : tenHs.toFixed(0)+' floors'} to your head start.
+        Prestiging now adds ${d.gain.toFixed(0)} floors.</s></p>
+      <details class="disc"><summary><span>WHAT CHANGES</span><span>+</span></summary>
+        <div class="body"><div class="blk lose"><div class="bh"><span class="t">RESETS</span></div>
+          <div class="rows">${loseRows(d)}</div></div>
+          <div class="blk keep"><div class="bh"><span class="t">CARRIES</span></div>
+          <div class="rows">${keepRows(d)}</div></div></div></details>
+      <div style="padding-bottom:20px"><button class="btn go">PRESTIGE</button>
+        <div style="height:8px"></div><button class="btn ghost">KEEP CLIMBING</button></div>
+    </div>`;
+  }},
+};
+const ORDER = ['A','B','C','D'];
+</script>
+
+<script>
+function render(){
+  const d = D();
+  window.__yOf = renderScene(VARIANTS[variant].top(d));
+  document.getElementById('overlay').innerHTML = VARIANTS[variant].render(d);
+  // notes
+  const v = VARIANTS[variant];
+  document.getElementById('vtag').textContent = v.tag;
+  document.getElementById('vname').textContent = variant + ' — ' + v.name;
+  document.getElementById('vbody').innerHTML = v.body;
+  document.getElementById('swlbl').innerHTML = `${variant} <small>${v.name}</small>`;
+  document.getElementById('peakLbl').textContent = d.p;
+  // controls
+  for (const b of document.querySelectorAll('#segRun button'))
+    b.setAttribute('aria-pressed', String(+b.dataset.run === runNo));
+  for (const b of document.querySelectorAll('#segMoment button'))
+    b.setAttribute('aria-pressed', String(b.dataset.moment === moment));
+  // state — the full relevant state, every render
+  document.getElementById('statetbl').innerHTML = `
+    <tr><td>Run just played</td><td>${runNo} · ${mins(d.thisRunMin)}</td></tr>
+    <tr><td>Prestige at floor</td><td>${d.p}${d.p === d.r.peak ? ' (where it stalled)' : ''}</td></tr>
+    <tr><td>Floors in last 10 min</td><td>${d.r.last10}</td></tr>
+    <tr><td>Multiplier in → out</td><td>×${d.Min < 100 ? d.Min.toFixed(2) : d.Min.toExponential(2)} → ×${d.Mout < 100 ? d.Mout.toFixed(2) : d.Mout.toExponential(2)}</td></tr>
+    <tr><td>Head start in → out</td><td>${d.hsIn.toFixed(1)} → ${d.hsOut.toFixed(1)} floors</td></tr>
+    <tr><td>Bought by this prestige</td><td>+${d.gain.toFixed(1)} floors</td></tr>
+    <tr><td>Head start ÷ peak</td><td>${(d.hsOut / d.p * 100).toFixed(0)}%</td></tr>
+    <tr><td>One more floor is worth</td><td>+${d.dHs.toFixed(3)} floors</td></tr>
+    <tr><td>One more floor costs</td><td>${mins(d.minPerFloor)}</td></tr>
+    <tr><td>Back to floor ${d.p} next run</td><td>${d.back != null ? mins(d.back) : 'never got there'}</td></tr>
+    <tr><td>Gold surrendered</td><td>${gold(d.gLost)}</td></tr>`;
+}
+
+function setVariant(v){
+  variant = v;
+  const u = new URL(location); u.searchParams.set('variant', v); history.replaceState({}, '', u);
+  render();
+}
+document.getElementById('prev').onclick = () => setVariant(ORDER[(ORDER.indexOf(variant)+ORDER.length-1)%ORDER.length]);
+document.getElementById('next').onclick = () => setVariant(ORDER[(ORDER.indexOf(variant)+1)%ORDER.length]);
+addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable)) return;
+  if (e.key === 'ArrowLeft')  document.getElementById('prev').click();
+  if (e.key === 'ArrowRight') document.getElementById('next').click();
+});
+
+const slider = document.getElementById('peak');
+for (const b of document.querySelectorAll('#segRun button'))
+  b.onclick = () => { runNo = +b.dataset.run; peak = RUNS[runNo].peak; slider.value = peak; render(); };
+for (const b of document.querySelectorAll('#segMoment button'))
+  b.onclick = () => { moment = b.dataset.moment; render(); };
+slider.oninput = () => { peak = +slider.value; render(); };
+
+peak = RUNS[1].peak; slider.value = peak;
+render();
+</script>

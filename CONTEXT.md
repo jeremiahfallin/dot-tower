@@ -39,8 +39,10 @@ A named behavioural archetype shared by many climbers — melee, ranged, or heal
 _Avoid_: Class, role, job
 
 **Rank**:
-The upgrade tier of a climber type, **purchased with gold**. Rank is per type, and resets on prestige.
-A rank is bought; a level is earned. The two are not interchangeable — see **Level**.
+A **purchased** upgrade tier. A rank is bought; a level is earned — the two are not interchangeable,
+see **Level**. Two things have ranks, and they differ in currency and in what resets: a **climber
+type**'s rank is bought with gold and resets on prestige; a **relic**'s rank is bought with the
+currency prestige grants and does *not* reset.
 _Avoid_: Tier, star
 
 **Level**:
@@ -123,8 +125,17 @@ prestige is shown.
 _Avoid_: Floors skipped, free floors, offset, ascension level
 
 **Relic**:
-A permanent qualitative modifier — income, lock cost, cooldowns, spawn rate, climber-type behaviour. Relics never grant raw health or damage; that is the prestige multiplier's sole job.
+A permanent qualitative modifier, granted the first time the climb reaches a milestone floor. Each
+relic is unique, is never lost, and has its own **rank**. Relics never grant uniform health or
+damage — that is the prestige multiplier's sole job — and never a flat percentage of gold, lock
+cost or rank cost, which the curve erases.
 _Avoid_: Artifact, trinket, rune
+
+**Effect kind**:
+One entry in the closed set of things a relic is able to modify. A relic is a *condition*, an
+effect kind, and a magnitude; the set of relics is open and lives in tuning data, the set of effect
+kinds is closed and changing it is a design decision. No two relics share an effect kind.
+_Avoid_: Effect type, modifier type, stat
 
 **Offline gold**:
 The gold granted for time spent with the game closed. It is the only thing earned while away — the

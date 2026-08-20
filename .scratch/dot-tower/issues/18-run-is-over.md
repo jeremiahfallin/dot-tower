@@ -43,3 +43,23 @@ Not settled:
 5. **Does this change at depth?** Ticket 17 is measuring whether runs get longer as the account
    matures. If a mature run spans days and many pickups, a six-minute flat peak is a normal
    Tuesday, not a stall.
+
+## Added by ticket 11
+
+Prestige now grants a **currency spent on relic ranks**, which puts a second gain on the prestige
+side of the trigger this ticket owns.
+
+It was scaled deliberately to avoid breaking that trigger: the currency pays on **peak floor beyond
+your previous best**, so only new depth earns it. Flat-per-prestige was rejected because it makes
+**prestige-spam optimal** — ticket 08 measured re-climbing at 3× speed, so a loop of shallow runs
+would out-earn one deep run and directly fight the stall logic ticket 08 established.
+
+Two things for this ticket to carry:
+
+1. **The choice was structural, not measured.** Ticket 07 hit the limits of the stall heuristic for
+   detecting run-length *trends* (ticket 17's problem), so "new depth only" was chosen because it
+   needs no measurement. If ticket 17 produces a tool that *can* measure trends, this is worth
+   re-checking rather than assuming.
+2. **The prestige ledger now has a third gain line** — earned multiplier, head start in floors, and
+   relic currency. Ticket 08 judged line count safe because each has its own units, but this ticket
+   owns whether the trigger stays legible with three things on it.

@@ -28,7 +28,9 @@ desktop that a phone player cannot reach.** A desktop-only readout is a bug, not
 - **The ability bar is the one region nothing may ever occlude.** Abilities are cooldown-gated, so
   covering them costs uptime — the throttle [0005](0005-the-hero-multiplies-climbers-add.md) makes
   the hero's whole contribution.
-- **Relics have no home yet.** They are the first thing to be told "you are rare enough to be
-  modal", and ticket 11 has to say how rare they actually are before that holds.
+- **Relics are modal, reached at prestige** (settled by ticket 11). Relic currency is granted at
+  prestige, so relic spending is a burst once per run, next to a surface already modal and already
+  rare. The caveat is load-bearing: if relic currency ever becomes earnable *during* a run, relics
+  become a moment-to-moment spend and this rule sends them back onto the permanent block.
 - Layout still branches on window aspect ratio and never on `target_os`, so both frames stay
   testable by resizing a desktop window.

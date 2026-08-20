@@ -63,3 +63,28 @@ hero*, not by buying healers.
 
 So the healer cap and rank question this ticket owns cannot be answered independently of which
 hero is stationed. A non-taunting hero takes 3.5%.
+
+## Added by ticket 11
+
+Relics move composition, confirmed — this ticket's question 5 is answered as **yes, deliberately**.
+The levers are the `type cap` and `type stat` effect kinds, and they arrive with constraints
+attached:
+
+- **Type cap is a relic effect kind**, so the caps this ticket sets are a floor that relics raise,
+  not a fixed authored value. If this ticket makes caps player-upgradeable too, cap becomes a
+  *third* thing moving one number and the attribution problem returns.
+- **A type-stat relic must be large enough to change composition** — `+15%` melee health is
+  exactly 1.0 ranks and is banned as noise, while doubling melee health moves healer demand
+  because melee absorbs 66% of all healing
+  ([ADR 0003 amendment](../../../docs/adr/0003-relics-modify-prestige-multiplies.md)). So relics
+  can only shift the mix in *large* steps, which means they cannot be this ticket's fine-grained
+  composition dial.
+- **Rank-cost relics are dead** — `rank_cost_base` 1.30 means a −20% relic buys 0.85 of one rank.
+  Gold competition cannot be relieved by relics, so if this ticket finds gold competition
+  insufficient, relics are not the escape hatch.
+- **Replacement interval is also an effect kind**, and ticket 06 found it is the run-length dial
+  for the whole game — so a spawn-rate relic is a run-length relic, and this ticket's coupling of
+  composition to pacing runs through it.
+
+Ticket 19 (ranged attack reach) was split out of ticket 11 and is upstream of this ticket's
+question: if ranged becomes positionally safe rather than statistically safe, the mix moves.

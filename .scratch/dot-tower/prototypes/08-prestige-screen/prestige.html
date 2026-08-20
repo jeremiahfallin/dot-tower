@@ -197,6 +197,7 @@ input[type=range]{width:210px;accent-color:var(--gold)}
         </div></div>
       <div class="ctrl"><span class="k">Moment</span>
         <div class="seg" id="segMoment">
+          <button data-moment="explain">First time only</button>
           <button data-moment="preview">Before committing</button>
           <button data-moment="after">Just after</button>
           <button data-moment="next">Next run</button>
@@ -309,11 +310,17 @@ function loseRows(d){
       <span class="val"><span class="strike">${a}</span><span class="arrow">→</span>${b}</span></div>`).join('');
 }
 function keepRows(d){
-  return [
+  // Two multipliers exist and only one is legible. This run's EARNED multiplier is a log-ish
+  // function of peak floor -- x5.18 at floor 147, x38.6 at floor 1,000 -- so it stays two or
+  // three digits forever. The CUMULATIVE product is the one ticket 06 measured at x10^11, and it
+  // is never shown: it appears only as head start in floors, which is exact.
+  const rows = [
     ['Head start', d.hsIn.toFixed(0) + ' floors', d.hsOut.toFixed(0) + ' floors'],
     ['Relics', '3', '3'],
   ].map(([n,a,b]) => `<div class="lrow"><span class="n">${n}</span>
       <span class="val">${a}<span class="arrow">→</span><span style="color:var(--ok)">${b}</span></span></div>`).join('');
+  return `<div class="lrow"><span class="n">This run earns</span>
+      <span class="val" style="color:var(--gold);font-size:13px">×${d.earned.toFixed(2)}</span></div>` + rows;
 }
 const costChips = (d) => [
   `${gold(d.gLost)} gold`, `floor ${d.p}`, `${d.lockLost} locks`,
@@ -351,16 +358,37 @@ function chart(d, {actualTo = null} = {}){
 const ABAR = `<div class="abar">${['STRIKE','RALLY','GUARD','WARCRY']
   .map(n=>`<div class="abtn">${n}</div>`).join('')}</div>`;
 
+// Shown once, the first time the player ever prestiges, ahead of the ledger. Identical across
+// variants -- it is a decided one-time panel, not one of the things under test.
+function explainer(d){
+  return `<div class="dim"></div><div class="verdict">
+    <div class="eyeb">SHOWN ONCE</div>
+    <p class="big">You've climbed as far as this run goes.
+      <s>Prestige ends it. Your gold, your floors, your locks, your climber ranks and your hero's
+      levels all go back to the start.<br><br>
+      In exchange every floor in the tower gets permanently easier — this run would make them
+      ${d.gain.toFixed(0)} floors easier — for the next run and every run after it.<br><br>
+      The next screen shows exactly what you give up and exactly what you get. You'll see it every
+      time, so you never have to take this on trust.</s></p>
+    <div style="padding-bottom:20px"><button class="btn go">SHOW ME</button></div></div>`;
+}
+
 const VARIANTS = {
 
 A: { name:'The ledger', tag:'Itemised · no recommendation',
-  body:`<p>A full-screen modal that lists <b>every</b> line that changes, struck-through old value beside new,
-    losses first and gains second. No verdict, no persuasion — the player adds it up.</p>
-  <p>Answers ticket 08's Q1 and Q3 completely and Q2 by being a preview. Its risk is the one the reference
-    game has: a wall of numbers <em>is</em> the illegibility, and the single line that matters (head start)
-    is buried among six that don't.</p>`,
+  body:`<p><b>Chosen.</b> A full-screen modal that lists <b>every</b> line that changes, struck-through old
+    value beside new, losses first and gains second. No verdict, no persuasion — the player adds it up.
+    Nothing is hidden behind a disclosure and nothing is priced in minutes instead of units: the ranks
+    and levels that reset are named, at their real values.</p>
+  <p>Two multipliers exist and the block shows only the legible one. the <b>This run earns</b> row — a
+    log-ish function of peak floor, ×5.18 at floor 147 and still only ×38.6 at floor 1,000. The
+    <em>cumulative</em> product, which ticket 06 measured at ×10¹¹ by floor 1,000, never appears; it is
+    carried entirely by the head-start line, which is exact rather than a translation.</p>
+  <p>The remaining risk is the reference game's: a wall of numbers <em>is</em> illegibility. The footer
+    line carries the mitigation — the whole ledger summarised as floors and minutes.</p>`,
   top:(d)=> d.p + 3,
   render(d){
+    if (moment === 'explain') return explainer(d);
     if (moment === 'next') return `${ABAR}<div class="banner"><span class="k">PRESTIGE 1 · SETTLED</span>
       <p>Back at floor <b>${d.p}</b>. That took <b>${mins(d.thisRunMin)}</b> last run and
       <b>${mins(d.back)}</b> this one. Ranks are at ${RUNS[runNo+1]?'~'+Math.round(d.ranksLost.melee*0.6):'—'} and climbing.</p></div>`;
@@ -391,6 +419,7 @@ B: { name:'The tower drops', tag:'Diegetic · no modal',
     Consistent with ticket 09's split — spatial things live in the tower.</p>`,
   top:(d)=> moment === 'after' ? 30 : d.p + 3,
   render(d){
+    if (moment === 'explain') return explainer(d);
     const yOf = window.__yOf;
     if (moment === 'after'){
       const h = Math.min(d.gain, 29) * FH;
@@ -425,6 +454,7 @@ C: { name:'Two runs',  tag:'Time axis · shows the stall',
     chart draws the real line over the projection, so "was it worth it" is a picture, not a memory.</p>`,
   top:(d)=> d.p + 3,
   render(d){
+    if (moment === 'explain') return explainer(d);
     if (moment === 'next') return `${ABAR}<div class="banner" style="bottom:96px">
       <span class="k">RUN ${runNo+1} · VS THE PROMISE</span>
       <div class="chartbox" style="margin:6px 0 8px">${chart(d,{actualTo:d.back})}</div>
@@ -458,6 +488,7 @@ D: { name:'The verdict', tag:'One sentence · details collapsed',
     ranks come back in ten minutes. Its risk is paternalism — the player is being told what to think.</p>`,
   top:(d)=> moment === 'after' ? 30 : d.p + 3,
   render(d){
+    if (moment === 'explain') return explainer(d);
     if (moment === 'next') return `${ABAR}<div class="banner">
       <span class="k">FLOOR ${d.p} · AGAIN</span>
       <p>Last run this floor took <b>${mins(d.thisRunMin)}</b>. This run it took <b>${mins(d.back)}</b>.</p></div>`;

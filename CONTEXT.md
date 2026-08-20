@@ -92,8 +92,20 @@ Deliberately ending a run to convert its progress into a permanent multiplier. R
 _Avoid_: Rebirth, ascension, reset
 
 **Prestige multiplier**:
-The single permanent scalar applied to climber and hero health and damage. The only source of permanent raw power.
+The single permanent scalar applied to climber and hero health and damage. The only source of
+permanent raw power. Two readings matter and must not be confused. The **earned** multiplier is
+what one prestige is worth on its own, a function of that run's peak floor; it stays small and is
+shown to the player. The **cumulative** multiplier is the running product of every earned
+multiplier so far; it grows without bound and is never displayed — see **Head start**.
 _Avoid_: Ascension bonus, legacy bonus
+
+**Head start**:
+The cumulative **prestige multiplier** expressed as a number of floors: how far the whole tower has
+dropped. With a head start of *h*, floor *f* now fights exactly as floor *f − h* did before,
+because enemy health and damage scale per floor while the multiplier scales climbers — so it is an
+exact restatement, not a friendly approximation. This is the only form in which accumulated
+prestige is shown.
+_Avoid_: Floors skipped, free floors, offset, ascension level
 
 **Relic**:
 A permanent qualitative modifier — income, lock cost, cooldowns, spawn rate, climber-type behaviour. Relics never grant raw health or damage; that is the prestige multiplier's sole job.

@@ -32,6 +32,9 @@ export const DEFAULTS = {
   heroStation: 'wall',       // 'wall' | 'below' | 'off'
   heroBelowOffset: 6,        // floors below the wall when stationing 'below'
   heroZone: 0,               // floors either side of its post the hero patrols, keeping them clear
+  heroAuraMult: 1.0,         // multiplies damage dealt AND gold earned by climbers in the aura
+  heroAuraFloors: 0,         // aura reaches its floor +/- N
+  heroTaunt: false,          // hero is the primary target on its floor while it lives
   heroRegenPct: 0,           // fraction of max HP regenerated per second
 
   // --- locking ---
@@ -86,6 +89,8 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
   let heroLevel = 1, heroFloor = 1, heroHp = c.heroHp0 * M, heroDeadUntil = -1;
   let peak = 1, lastPeakGainAt = 0;
   let deaths = 0, kills = 0, goldEarned = 0, healToHero = 0, healToClimbers = 0;
+  let heroAliveTicks = 0, heroTicks = 0, heroDeaths = 0;
+  let killsInAura = 0, killsTotal = 0;   // kill COUNT, not kill value -- the XP question
   const healByKind = { melee: 0, ranged: 0, healer: 0, hero: 0 };
 
   const climbers = [];                      // {type, floor, prog, hp}
@@ -179,6 +184,7 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
       byFloor.get(cl.floor).push(cl);
     }
     const heroAlive = c.heroStation !== 'off' && t >= heroDeadUntil;
+    if (c.heroStation !== 'off') { heroTicks++; if (heroAlive) heroAliveTicks++; }
     // The hero holds a stretch, not a point: each tick it fights the lowest floor in its zone
     // that still has enemies, so floors behind it stay clear and climbers transit them free.
     let heroTarget = heroFloor;
@@ -199,8 +205,11 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
       const heroHere = heroAlive && heroTarget === f;
       if (group.length === 0 && !heroHere) continue;
 
+      // The hero's aura multiplies what climbers already do, rather than adding to it.
+      const inAura = heroAlive && c.heroAuraMult > 1 && Math.abs(f - heroFloor) <= c.heroAuraFloors;
+      const auraMult = inAura ? c.heroAuraMult : 1;
       let dps = 0;
-      for (const cl of group) dps += climberDps(c, cl.type, ranks[cl.type], M);
+      for (const cl of group) dps += climberDps(c, cl.type, ranks[cl.type], M) * auraMult;
       if (heroHere) dps += c.heroDps0 * Math.pow(c.heroPowerBase, heroLevel - 1) * M;
 
       // damage the pack
@@ -210,10 +219,21 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
       if (s.poolHp <= 0) { s.poolHp = 0; s.count = 0; s.respawnAt = t + c.respawnTimer; }
       else s.count = Math.ceil(s.poolHp / eHp);
       const killed = before - s.count;
-      if (killed > 0) { kills += killed; credit(f, killed * goldPerKill(c, f)); }
+      if (killed > 0) {
+        kills += killed; credit(f, killed * goldPerKill(c, f) * auraMult);
+        killsTotal += killed;
+        if (heroAlive && Math.abs(f - heroFloor) <= c.heroAuraFloors) killsInAura += killed;
+      }
 
       // the pack hits back, weighted by threat
       const incoming = ((before + s.count) / 2) * enemyDps(c, f) * dt;
+      // Taunt: the hero eats the floor's damage instead of sharing it by threat weight.
+      if (c.heroTaunt && heroHere) {
+        heroHp -= incoming;
+        if (heroHp <= 0) { heroDeaths++; heroDeadUntil = t + c.heroRespawn;
+          heroHp = c.heroHp0 * Math.pow(c.heroPowerBase, heroLevel - 1) * M; }
+        continue;
+      }
       let totalThreat = 0;
       for (const cl of group) totalThreat += c.types[cl.type].threat;
       if (heroHere) totalThreat += c.heroThreat;
@@ -221,7 +241,7 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
         for (const cl of group) cl.hp -= incoming * (c.types[cl.type].threat / totalThreat);
         if (heroHere) {
           heroHp -= incoming * (c.heroThreat / totalThreat);
-          if (heroHp <= 0) { heroDeadUntil = t + c.heroRespawn; heroHp = c.heroHp0 * Math.pow(c.heroPowerBase, heroLevel - 1) * M; }
+          if (heroHp <= 0) { heroDeaths++; heroDeadUntil = t + c.heroRespawn; heroHp = c.heroHp0 * Math.pow(c.heroPowerBase, heroLevel - 1) * M; }
         }
       }
     }
@@ -319,6 +339,7 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
 
   return {
     seconds: t, gold, goldEarned, peak, deaths, kills, healToHero, healToClimbers, healByKind,
+    heroUptime: heroTicks ? heroAliveTicks / heroTicks : 1, heroDeaths, killsInAura, killsTotal,
     lockLevel, lockLine: lockLine(), sealedRate, ranks: { ...ranks }, heroLevel,
     prestigeMultEarned: prestigeMultFor(c, peak),
     samples, events, pop: climbers.length,

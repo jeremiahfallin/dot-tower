@@ -52,3 +52,14 @@ Two measurements worth carrying in:
 - Replacement rate is per type and only fires while that type is under its cap — settled at 5s.
   It turned out to be the run-length dial for the whole game, so composition and pacing are
   coupled through it.
+
+## Added by ticket 16
+
+Healer supply is now coupled to hero choice. A taunting tank absorbs **38.4% of all healing** in a
+run — it stands in front of the climbers, so healing spent on it comes back to them (climbers reach
+the wall at 90% rather than 86%, and the hero's uptime rises 73% → 86%). But a third of your
+sustain is a large standing commitment, and it is a commitment the player makes by *picking a
+hero*, not by buying healers.
+
+So the healer cap and rank question this ticket owns cannot be answered independently of which
+hero is stationed. A non-taunting hero takes 3.5%.

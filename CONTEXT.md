@@ -37,16 +37,39 @@ A named behavioural archetype shared by many climbers — melee, ranged, or heal
 _Avoid_: Class, role, job
 
 **Rank**:
-The upgrade tier of a climber type, purchased with gold. Rank is per type, and resets on prestige.
-_Avoid_: Level, tier, star
+The upgrade tier of a climber type, **purchased with gold**. Rank is per type, and resets on prestige.
+A rank is bought; a level is earned. The two are not interchangeable — see **Level**.
+_Avoid_: Tier, star
+
+**Level**:
+The progression tier of the hero, **earned with experience** rather than bought. There is no
+gold cost and no purchase decision. Levels are per hero and reset on prestige.
+_Avoid_: Rank, hero rank
+
+**Experience**:
+The quantity a hero accumulates from enemies defeated inside its aura, and its only source of
+levels. Enemies killed elsewhere in the tower grant none, so experience reflects where the hero
+has actually fought. Not a currency: it cannot be spent, only accrued.
+_Avoid_: XP, exp, points
 
 **Hero**:
-The single persistent unit the player selects and stations on a floor it repeats across. It fights automatically; its abilities are triggered by hand.
+The single persistent unit the player selects and stations on a floor it repeats across. Its
+contribution is its **aura**, which multiplies what climbers on that floor already do; it also
+fights automatically, but that damage is deliberately not where its value lies. Its abilities are
+triggered by hand. It gains **levels** from **experience**, never from gold.
 _Avoid_: Champion, leader, commander, climber
 
 **Aura**:
-A continuous effect applied to every friendly within a radius, with no target selection. The healer's heal is one.
+A continuous effect applied to every friendly within a radius, with no target selection. The
+healer's heal is one; the hero's damage-and-gold multiplier is another. An aura applies only while
+its source is alive, which is what makes hero uptime matter.
 _Avoid_: Buff, field, pulse
+
+**Taunt**:
+A hero property, not a universal rule: a taunting hero is the primary target on its floor and
+absorbs damage that would otherwise fall on climbers. Whether a hero taunts is part of what
+distinguishes one from another, alongside its abilities and its health.
+_Avoid_: Aggro, threat, provoke
 
 **Type cap**:
 The maximum number of live climbers of a single climber type. Each type has its own; there is no cap across the stream as a whole.

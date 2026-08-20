@@ -164,3 +164,29 @@ measurable, because combat concentrates every climber on the contested floor and
 rarely finds anyone new. Settled at **±1**. Worth noting that reach 0 would have dissolved the
 `FloorPos` radius gap this ticket raised — "radius" needs no definition if it never crosses a
 floor — and that option remains available at no cost if the coordinate question bites later.
+
+## Amended by ticket 16
+
+**The uptime claim in this ticket is backwards.** It says "station at the wall and your
+contribution is your survival fraction; station below it and you run at 100%." Measured, without
+taunt the hero runs at **98% uptime at the wall and 71% below it** — seventy climbers bunched at
+the wall soak the damage, so the crowd is armour, while a hero farming below stands alone on a
+respawned floor against a whole pack. The wall is the *safe* place for a hero, not the dangerous
+one.
+
+What makes the wall costly is **taunt** — the hero being the primary target on its floor — and
+taunt is a per-hero property rather than a universal rule. With it, wall uptime falls to 74% and
+this ticket's intent becomes true.
+
+**The hero-as-heal-target decision is vindicated, for a different reason than the one recorded
+here.** This ticket kept the hero in the candidate set arguing it buys a link between placement and
+composition for free; ticket 06 measured that as 13% of sustain for no return and flagged it for
+removal. It is now clearly correct: hero survival gates both the aura multiplier and experience
+accrual, and a taunting hero is physically in front of the climbers. Keeping it in gives +2 floors,
+uptime 73% → 86%, and climbers arriving at **90% rather than 86%**. It costs **38.4%** of all
+healing with a taunting tank, against 3.5% with a hero that does not taunt.
+
+**Aura reach could follow the hero's to ±0.** Ticket 16 settled the hero's aura at its own floor,
+which retires the `FloorPos` radius gap this ticket raised — a reach that never crosses a floor
+needs no non-Euclidean distance rule. The healer's ±1 is not load-bearing (±0 through ±3 measured
+identically), so it can adopt the same rule whenever the coordinate question becomes inconvenient.

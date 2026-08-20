@@ -48,3 +48,38 @@ The premise does not currently hold: there is no placement tradeoff to make visi
 Stationed at the wall, below it, or not at all, the peak floor moves by under 2%. Patrol
 zones and hero regeneration change nothing. Ticket 16 now has to establish what the hero
 contributes before this ticket has a subject.
+
+## Answered by ticket 16 — this ticket now has a subject
+
+The premise is settled, and it is not what this ticket assumed. **There is no placement tradeoff
+to visualise.** Stationing at the wall dominates on gold and experience alike, so placement is a
+learnable rule — put the hero where the fighting is — not a decision the player re-evaluates.
+
+Item 1 ("what does the player compare?") and item 5 ("does the game ever suggest a placement?")
+are therefore moot: there is nothing to compare, and the right placement is always the same.
+
+What replaces them, and what this ticket should now be about:
+
+1. **Uptime.** The aura multiplies only while the hero lives, so a hero at 74% uptime is
+   delivering 74% of its contribution. This is the number the player must be able to read, and it
+   is invisible without help — the hero looks the same standing there whether it is thriving or
+   dying every twenty seconds.
+2. **The aura itself.** It applies to one floor, so it wants one highlighted row and a legible
+   statement of what it is doing to the climbers standing in it.
+3. **Experience.** It accrues only from kills inside the aura, which is a rule the player has to
+   learn by seeing it, not by reading it.
+4. **Ability moments.** Abilities act on state the aura cannot reach, and the design test is
+   whether there is a wrong moment to press each one. If the feedback cannot show a player that
+   they pressed one at the wrong moment, the ability has no moment.
+5. **Item 3 stands unchanged** — the wall still needs indicating, and it matters more now, since
+   "put the hero where the fighting is" is unfollowable if the player cannot see where that is.
+
+**The unhandled lock-line case is resolved**: the hero **sprints up**, exactly as trailing
+climbers do under ticket 03. Blocking the lock would make a good purchase conditional on where a
+unit stands; and silent relocation is a far smaller sin now that placement is a rule rather than a
+strategic choice, particularly since locking moves the hero toward the wall anyway.
+
+**Ticket 05's addendum above is superseded in part**: it says a hero parked at the wall runs at a
+survival fraction while one below runs at 100%. Measured, that is backwards without taunt — 98% at
+the wall against 71% below, because seventy climbers at the wall soak the damage and a farming hero
+stands alone. Taunt is what makes the wall costly, and taunt is a per-hero property.

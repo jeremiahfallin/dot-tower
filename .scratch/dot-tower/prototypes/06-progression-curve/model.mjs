@@ -19,6 +19,17 @@ export const DEFAULTS = {
     healer: { hp0: 36, dps0: 0,   heal0: 3.5, cap: 20, rankCost0: 45, spawnInterval: 5.0, threat: 0.5 },
   },
   climbSpeed: 0.5,           // floors/s across a cleared floor
+
+  // --- reach (ticket 19) ---
+  targeting: 'threat',       // 'threat' = incoming split by threat weight (ticket 06's abstraction)
+                             // 'line'   = incoming falls front-to-back through the formation
+  formation: { melee: 0, ranged: 1, healer: 2 }, // rank in the line under 'line'; 0 is the front
+  lineFocus: false,          // within a rank: false spreads the hit across it, true finishes off
+                             // the weakest unit first. The forgiving reading against the harsh one.
+  reach: { melee: 0, ranged: 0, healer: 0 },     // floors ABOVE its own a type can attack across
+  standoff: false,           // does a type with reach halt short of the fighting and fire up?
+  failedFloorReset: false,   // ticket 03 says a floor nobody is fighting restores its pack.
+                             // The model has never done this; false is what tickets 06-16 measured.
   auraFloors: 1,             // heal reaches same floor +/- N
   healPolicy: 'lowestFraction',        // which targeting policy the healer runs -- see HEAL_POLICIES
   healSelf: true,            // may a healer be its own target?
@@ -89,6 +100,7 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
   let heroLevel = 1, heroFloor = 1, heroHp = c.heroHp0 * M, heroDeadUntil = -1;
   let peak = 1, lastPeakGainAt = 0;
   let deaths = 0, kills = 0, goldEarned = 0, healToHero = 0, healToClimbers = 0;
+  const deathsByType = { melee: 0, ranged: 0, healer: 0 };
   let heroAliveTicks = 0, heroTicks = 0, heroDeaths = 0;
   let killsInAura = 0, killsTotal = 0;   // kill COUNT, not kill value -- the XP question
   const healByKind = { melee: 0, ranged: 0, healer: 0, hero: 0 };
@@ -195,22 +207,49 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
       }
     }
 
+    // --- reach: who is shooting at which floor (ticket 19) ---
+    // A climber attacks the NEAREST floor with enemies at or above its own, within its type's
+    // reach. Its own floor wins, and nobody attacks two floors, so reach buys range, never output.
+    const attackers = new Map();                 // floor -> climbers firing INTO it
+    for (const cl of climbers) {
+      const r = c.reach[cl.type] || 0;
+      for (let d = 0; d <= r; d++) {
+        const f = cl.floor + d;
+        const s2 = floors.get(f);
+        if (s2 && s2.count === 0) continue;      // an unvisited floor still holds a full pack
+        if (!attackers.has(f)) attackers.set(f, []);
+        attackers.get(f).push(cl);
+        break;
+      }
+    }
+
     // --- combat, floor by floor ---
-    const contested = new Set([...byFloor.keys()]);
+    const contested = new Set([...attackers.keys()]);
     if (heroAlive) contested.add(heroTarget);
     for (const f of contested) {
       const s = floorState(f);
       if (s.count === 0) continue;
-      const group = byFloor.get(f) || [];
+      const group = attackers.get(f) || [];      // who is shooting at this floor
+      const standing = byFloor.get(f) || [];     // who is standing in it, and can therefore be hit
       const heroHere = heroAlive && heroTarget === f;
       if (group.length === 0 && !heroHere) continue;
 
-      // The hero's aura multiplies what climbers already do, rather than adding to it.
-      const inAura = heroAlive && c.heroAuraMult > 1 && Math.abs(f - heroFloor) <= c.heroAuraFloors;
-      const auraMult = inAura ? c.heroAuraMult : 1;
-      let dps = 0;
-      for (const cl of group) dps += climberDps(c, cl.type, ranks[cl.type], M) * auraMult;
-      if (heroHere) dps += c.heroDps0 * Math.pow(c.heroPowerBase, heroLevel - 1) * M;
+      // The hero's aura multiplies what climbers already do. It is keyed on where the CLIMBER
+      // stands, not on what it is firing at -- so standing off walks out of the aura.
+      const auraOn = heroAlive && c.heroAuraMult > 1;
+      const inAura = (fl) => auraOn && Math.abs(fl - heroFloor) <= c.heroAuraFloors;
+      let dps = 0, goldWeighted = 0;
+      for (const cl of group) {
+        const m = inAura(cl.floor) ? c.heroAuraMult : 1;
+        const d = climberDps(c, cl.type, ranks[cl.type], M) * m;
+        dps += d; goldWeighted += d * m;
+      }
+      if (heroHere) {
+        const m = inAura(heroFloor) ? c.heroAuraMult : 1;
+        const d = c.heroDps0 * Math.pow(c.heroPowerBase, heroLevel - 1) * M;
+        dps += d; goldWeighted += d * m;
+      }
+      const goldMult = dps > 0 ? goldWeighted / dps : 1;
 
       // damage the pack
       const eHp = enemyHp(c, f);
@@ -220,29 +259,65 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
       else s.count = Math.ceil(s.poolHp / eHp);
       const killed = before - s.count;
       if (killed > 0) {
-        kills += killed; credit(f, killed * goldPerKill(c, f) * auraMult);
+        kills += killed; credit(f, killed * goldPerKill(c, f) * goldMult);
         killsTotal += killed;
         if (heroAlive && Math.abs(f - heroFloor) <= c.heroAuraFloors) killsInAura += killed;
       }
 
-      // the pack hits back, weighted by threat
+      // The pack hits back -- and it has no reach of its own. Only what STANDS here is hit.
       const incoming = ((before + s.count) / 2) * enemyDps(c, f) * dt;
-      // Taunt: the hero eats the floor's damage instead of sharing it by threat weight.
-      if (c.heroTaunt && heroHere) {
-        heroHp -= incoming;
+      const hitHero = (d) => {
+        heroHp -= d;
         if (heroHp <= 0) { heroDeaths++; heroDeadUntil = t + c.heroRespawn;
           heroHp = c.heroHp0 * Math.pow(c.heroPowerBase, heroLevel - 1) * M; }
-        continue;
-      }
-      let totalThreat = 0;
-      for (const cl of group) totalThreat += c.types[cl.type].threat;
-      if (heroHere) totalThreat += c.heroThreat;
-      if (totalThreat > 0) {
-        for (const cl of group) cl.hp -= incoming * (c.types[cl.type].threat / totalThreat);
-        if (heroHere) {
-          heroHp -= incoming * (c.heroThreat / totalThreat);
-          if (heroHp <= 0) { heroDeaths++; heroDeadUntil = t + c.heroRespawn; heroHp = c.heroHp0 * Math.pow(c.heroPowerBase, heroLevel - 1) * M; }
+      };
+      // Taunt: the hero eats the floor's damage instead of sharing it out.
+      if (c.heroTaunt && heroHere) { hitHero(incoming); continue; }
+
+      if (c.targeting === 'line') {
+        // Front-to-back: the pack hits the nearest rank of the formation and spills backward
+        // only once that rank has nothing left to absorb. Position IS the protection.
+        const tiers = new Map();
+        const push = (k, u) => { if (!tiers.has(k)) tiers.set(k, []); tiers.get(k).push(u); };
+        for (const cl of standing) push(c.formation[cl.type] ?? 0, { get: () => cl.hp, hit: (d) => { cl.hp -= d; } });
+        if (heroHere) push(0, { get: () => heroHp, hit: hitHero });
+        let remaining = incoming;
+        for (const k of [...tiers.keys()].sort((a, b) => a - b)) {
+          if (remaining <= 0) break;
+          const tier = tiers.get(k).filter((u) => u.get() > 0);
+          const pool = tier.reduce((a, u) => a + u.get(), 0);
+          if (pool <= 0) continue;
+          const take = Math.min(remaining, pool);
+          if (c.lineFocus) {
+            // The pack concentrates on whoever is nearest to falling, rather than sharing out.
+            let left = take;
+            for (const u of tier.sort((a, b) => a.get() - b.get())) {
+              if (left <= 0) break;
+              const bite = Math.min(left, u.get());
+              u.hit(bite); left -= bite;
+            }
+          } else {
+            for (const u of tier) u.hit(take * (u.get() / pool));
+          }
+          remaining -= take;
         }
+      } else {
+        let totalThreat = 0;
+        for (const cl of standing) totalThreat += c.types[cl.type].threat;
+        if (heroHere) totalThreat += c.heroThreat;
+        if (totalThreat > 0) {
+          for (const cl of standing) cl.hp -= incoming * (c.types[cl.type].threat / totalThreat);
+          if (heroHere) hitHero(incoming * (c.heroThreat / totalThreat));
+        }
+      }
+    }
+
+    // --- a floor nobody is fighting recovers (ticket 03's rule, off by default) ---
+    if (c.failedFloorReset) {
+      for (const [f, s] of floors) {
+        if (s.count === 0 || contested.has(f)) continue;
+        const full = c.packSize * enemyHp(c, f);
+        if (s.poolHp < full) { s.count = c.packSize; s.poolHp = full; }
       }
     }
 
@@ -291,16 +366,25 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
 
     // --- deaths ---
     for (let i = climbers.length - 1; i >= 0; i--) {
-      if (climbers[i].hp <= 0) { climbers.splice(i, 1); deaths++; }
+      if (climbers[i].hp <= 0) { deathsByType[climbers[i].type]++; climbers.splice(i, 1); deaths++; }
     }
 
     // --- movement: a cleared floor is walked across ---
     for (const cl of climbers) {
       const s = floorState(cl.floor);
-      if (s.count === 0) {
-        cl.prog += c.climbSpeed * dt;
-        if (cl.prog >= 1) { cl.prog = 0; cl.floor++; if (cl.floor > peak) { peak = cl.floor; lastPeakGainAt = t; } }
+      if (s.count !== 0) continue;
+      // Standoff: a type with reach stops as soon as the fighting comes INTO reach, rather
+      // than walking into it. This is what turns statistical safety into positional safety.
+      if (c.standoff) {
+        let held = false;
+        for (let d = 1; d <= (c.reach[cl.type] || 0); d++) {
+          const s2 = floors.get(cl.floor + d);
+          if (s2 ? s2.count > 0 : true) { held = true; break; }
+        }
+        if (held) continue;
       }
+      cl.prog += c.climbSpeed * dt;
+      if (cl.prog >= 1) { cl.prog = 0; cl.floor++; if (cl.floor > peak) { peak = cl.floor; lastPeakGainAt = t; } }
     }
 
     // --- sealed income ---
@@ -321,9 +405,22 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
       const w = currentWall();
       const atWall = climbers.filter((cl) => cl.floor >= w - 1);
       const wallHp = atWall.length ? atWall.reduce((a, cl) => a + cl.hp / cl.maxHp, 0) / atWall.length : 1;
+      // per type: how many are alive, how healthy they are, and how far back they stand
+      const popByType = { melee: 0, ranged: 0, healer: 0 };
+      const hpByType = { melee: 0, ranged: 0, healer: 0 };
+      const backByType = { melee: 0, ranged: 0, healer: 0 };
+      for (const cl of climbers) {
+        popByType[cl.type]++;
+        hpByType[cl.type] += cl.hp / cl.maxHp;
+        backByType[cl.type] += w - cl.floor;
+      }
+      for (const ty of ['melee', 'ranged', 'healer']) {
+        const n = popByType[ty] || 1;
+        hpByType[ty] /= n; backByType[ty] /= n;
+      }
       samples.push({
         t, gold, goldEarned, peak, wall: w, wallHp, lockLine: lockLine(), sealedRate,
-        pop: climbers.length, deaths, kills,
+        pop: climbers.length, popByType, hpByType, backByType, deaths, kills,
         ranks: { ...ranks }, heroLevel, heroFloor,
         gps: goldEarned / Math.max(t, 1),
       });
@@ -338,7 +435,7 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
   }
 
   return {
-    seconds: t, gold, goldEarned, peak, deaths, kills, healToHero, healToClimbers, healByKind,
+    seconds: t, gold, goldEarned, peak, deaths, deathsByType, kills, healToHero, healToClimbers, healByKind,
     heroUptime: heroTicks ? heroAliveTicks / heroTicks : 1, heroDeaths, killsInAura, killsTotal,
     lockLevel, lockLine: lockLine(), sealedRate, ranks: { ...ranks }, heroLevel,
     prestigeMultEarned: prestigeMultFor(c, peak),

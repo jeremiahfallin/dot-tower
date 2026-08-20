@@ -88,3 +88,48 @@ attached:
 
 Ticket 19 (ranged attack reach) was split out of ticket 11 and is upstream of this ticket's
 question: if ranged becomes positionally safe rather than statistically safe, the mix moves.
+
+## Added by ticket 19
+
+Ticket 19 went looking for whether ranged should have positional reach, found the answer was no
+([ADR 0010](../../../docs/adr/0010-combat-is-floor-local-and-has-no-reach.md)), and found a
+larger problem that lands squarely on this ticket: **no climber type has a survival identity, and
+the machinery this ticket owns is why.**
+
+Measured, as deaths per live climber over a 40-minute run:
+
+| | melee | ranged | healer | melee vs ranged |
+|---|---|---|---|---|
+| as shipped (threat 3.0 / 1.0 / 0.5) | 9.6 | 8.9 | 7.6 | **1.08×** |
+| ranged threat cut 4× to 0.25 | 10.1 | 9.5 | 8.3 | 1.07× |
+| threat weighting **off entirely** | 9.4 | 9.7 | 7.9 | **0.97×** |
+| standoff — ranged literally untouchable | 9.7 | 9.4 | 6.6 | 1.03× |
+
+Melee dies 1.08× as often as ranged. Delete threat weighting entirely and it is 0.97×. Make
+ranged *invulnerable on the contested floor* and it is 1.03×.
+
+The cause is **per-type replacement**. A type sitting at its cap that dies faster simply respawns
+faster, so deaths-per-capita converges on the replacement interval no matter what combat did. The
+damping is severe rather than total: **a 10× swing in ranged health produces a 1.3× swing in
+survival** (hp 30 → 300 moves 8.9 → 6.7; hp 30 → 3 moves 8.9 → 18.0).
+
+What this does to the questions above:
+
+- **Question 3 gains a second front.** Gold competition may or may not be sufficient to make
+  composition contested; either way, composition currently cannot be *expressed* through
+  survivability, because the caps and the 5s interval overwrite it. Whatever lever this ticket
+  chooses has to clear that compression, and `hp0` at ten times its value does not.
+- **Question 6 is load-bearing, not a detail.** Whether the spawn is skipped or passes to another
+  type at the cap is what decides whether death rate is a combat output or a scheduling artifact.
+  Today it is a scheduling artifact.
+- Ticket 06 found the replacement interval is the **run-length dial for the whole game**. It is
+  the **survival dial** too, so this ticket cannot move it for composition reasons without moving
+  run length — which is ticket 17's. The two are coupled through one constant.
+- **Question 5's answer narrows.** Ticket 11 already ruled that a type-stat relic must be large
+  enough to move composition; the compression measured here says how large. A relic that doubles
+  melee health buys about a 1.06× change in how often melee dies, so a type-stat relic aimed at
+  *survivability* is beneath the noise floor for the same reason ticket 11's income relics were.
+  Type-stat relics have to act on damage, or on the cap.
+- Ranged reach is **not** available as a composition lever, and the reason is worth carrying: it
+  makes ranged fire-and-forget, dropping its share of all healing from 23% to 2% and removing it
+  from the sustain economy — deleting a composition interaction rather than creating one.

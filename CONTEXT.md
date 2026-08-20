@@ -81,6 +81,21 @@ _Avoid_: Population cap, unit limit, squad size
 One of four cooldown-gated actions a hero possesses, fired manually by the player. There is no mana or energy resource.
 _Avoid_: Skill, spell, art, power
 
+### The screen
+
+**Tower column**:
+The vertical strip of floor rows the player watches, showing a window of the tower centred on the
+highest floor climbers have reached and clamped so it can never scroll below the lock line. It is
+the same width on a phone and on a monitor; a wider frame adds panels beside it rather than
+enlarging it.
+_Avoid_: Tower view, viewport, playfield, stage
+
+**Strip**:
+The single band above the ability bar carrying everything temporal — hero uptime over the last
+45 seconds, a record of ability presses, and a plain-language verdict on the most recent one.
+Everything spatial belongs on the **tower column** instead, and nothing appears in both.
+_Avoid_: HUD, status bar, panel, ticker
+
 ### Progression
 
 **Run**:

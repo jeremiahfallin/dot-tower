@@ -27,3 +27,15 @@ they are the hero's *only* route to getting stronger beyond levels.
 
 Note the aura multiplies gold as well as damage, so a relic touching it is an income relic and a
 combat relic at once. Whether that counts as one effect or two is this ticket's problem.
+
+## Added by ticket 10
+
+Relics have no place on the screen, and ticket 10's layout rule means they only get one by being
+**rare**. [ADR 0008](../../../docs/adr/0008-spending-is-never-modal.md) prices modality by frequency:
+ranks and locks are permanently on screen because they are bought every few seconds, and relics are
+assigned a modal surface on the assumption that they are reached a handful of times a run.
+
+So this ticket now has to answer one more thing, and the layout depends on it: **how often does the
+player acquire or interact with a relic?** If the answer is "often enough to be part of the moment
+to moment", the modal surface is wrong and relics need permanent space the portrait frame does not
+have — which would reopen ticket 10 rather than extend it.

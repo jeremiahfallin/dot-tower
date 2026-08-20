@@ -15,7 +15,9 @@ The unbounded vertical sequence of floors. There is exactly one.
 _Avoid_: Dungeon, run map
 
 **Lock**:
-A permanent-within-a-run gold purchase applied every 10 floors that raises the spawn point and guarantees a passive income rate from the floors beneath it.
+A permanent-within-a-run gold purchase applied every 10 floors that raises the spawn point, so
+every climber's walk to the front starts higher. It is a spawn-point and travel-time mechanic:
+the floors beneath a lock are sealed and produce **no** income.
 _Avoid_: Seal, lockdown, gate
 
 **Lock line**:
@@ -96,3 +98,15 @@ _Avoid_: Ascension bonus, legacy bonus
 **Relic**:
 A permanent qualitative modifier — income, lock cost, cooldowns, spawn rate, climber-type behaviour. Relics never grant raw health or damage; that is the prestige multiplier's sole job.
 _Avoid_: Artifact, trinket, rune
+
+**Offline gold**:
+The gold granted for time spent with the game closed. It is the only thing earned while away — the
+climb does not advance — and it is computed rather than simulated, as **best rate** multiplied by
+elapsed time up to a cap.
+_Avoid_: Offline progress, offline return, idle gold, AFK earnings
+
+**Best rate**:
+The highest sustained gold-per-second reached during the current run, and the rate **offline gold**
+pays at. It is a high-water mark rather than a recent average, so it cannot be sampled at an
+unrepresentative moment, and it resets on prestige.
+_Avoid_: Holding rate (holding is hero uptime), peak rate (peak is the floor), offline rate

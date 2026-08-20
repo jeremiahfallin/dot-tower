@@ -1,5 +1,11 @@
 # Offline progress is closed-form, gold only, and does not advance the climb
 
+> **Superseded by [0006](0006-offline-gold-pays-the-best-rate.md).** The shape survives — gold
+> only, closed-form, capped, no floor progress — but the source does not. Ticket 06 measured
+> sealed-floor income at 0.04% of frontier income, so the grant now pays the *best rate* of the
+> active band rather than a frozen rate from below the lock line. The consequence claimed below
+> that locking becomes the deliberate act before putting the phone down no longer holds.
+
 While the player is away, dot-tower grants gold computed as a closed-form function of locked floors, their guaranteed rate, and elapsed wall-clock time, capped at roughly 8-12 hours. The climb itself does not advance: floor progress requires the player to be present.
 
 ## Considered options

@@ -321,3 +321,84 @@ Tickets 02 and 10 both build on `bevy_ui` + `bevy_picking`. Neither is
 invalidated yet — but if the second device also corrupts, the UI foundation is
 in question with no obvious replacement, because ticket 02 banned the
 `Interaction` path for multi-touch reasons (#11553) that still hold.
+
+### Proposal: split probe F out of this ticket (session of 2026-08-21)
+
+**Not acted on — this is a proposal for whoever picks the ticket up next.** It
+proposes a resolution, two new tickets and a rewiring, and this session has
+already spent its one resolution on ticket 12.
+
+#### The case for splitting
+
+This ticket asks one thing: *get a minimal Bevy 2D app — a sprite and a touch
+handler that moves it — building, installing and running on a real Android
+device.* **That question is answered.** It builds, installs, launches, takes
+touch input, drags the sprite, and completes a synchronous save on suspend in
+2 ms. The toolchain, the device, the build times and four separate build-chain
+defects are all recorded above.
+
+Probe F is a different animal. It was *discovered* by bringup, but "why does
+`bevy_ui` fail to render on Android" is an open-ended graphics investigation
+with no known size, and it is now the only thing keeping this ticket open.
+
+The cost of leaving them fused is concrete: **[Low-end Android performance
+budget](14-android-performance-budget.md) is blocked by this ticket**, and has
+nothing whatever to do with a UI rendering bug. A hello-world that runs and
+takes touch input is exactly the instrument a performance budget needs, and it
+exists today. One unrelated bug is holding a frontier ticket hostage.
+
+#### Proposed shape
+
+1. **Resolve this ticket** on the bringup facts already recorded.
+
+2. **Open "Why bevy_ui does not render on Android"** (`prototype`), which
+   inherits everything gated behind probe F — including the probe readings this
+   ticket would otherwise abandon:
+   - probes **B**, **C** and **D**, all unreadable while the HUD is corrupt;
+   - probe **A**'s remainder — edge-coordinate sanity (#7528) and the
+     multi-finger high-water mark.
+
+   **This matters to ticket 02, which must not lose its questions.** Probes C
+   and D were *added to this ticket by ticket 02* — `content_rect()` versus
+   display cutouts, and the `UiScale` value giving crisp pixel text. They travel
+   with the new ticket rather than dying with this one.
+
+   First moves, cheapest first, none needing hardware we lack:
+   - **Vulkan versus GLES.** Compiled backends are `vulkan`, `metal`, `dx12`,
+     `webgl` — **no `gles`**, so every observation so far is Vulkan-only.
+     Enabling wgpu's `gles` feature (via a direct `wgpu` dependency for feature
+     unification; Bevy does not expose it) would say whether this is a
+     Vulkan-path bug. Strongest narrowing available for the effort.
+   - **Bevy 0.18 versus 0.19 on the same device.** Goes straight at ticket 13's
+     argument. If 0.18 corrupts identically, #14710 was never the operative
+     issue and 0.19.1 is simply not worse. If 0.18 is clean, this is a 0.19
+     regression and ticket 13's decision is actively harmful.
+   - **A minimal repro** — one solid-colour UI node, no text. The buttons never
+     rendered either, so this is likely all of `bevy_ui` rather than the glyph
+     atlas, but an upstream report needs the smallest case.
+   - **A second GPU vendor, cheaply.** No adb or loan required: the corruption
+     is visible to the naked eye, so mailing the APK to anyone with a Snapdragon
+     (Adreno) or MediaTek/Exynos (Mali) handset and asking for a photo is the
+     whole test. Firebase Test Lab's free tier is the fallback, and is also the
+     only realistic way to ever test the Adreno `Material2d` crash (#22925) that
+     this PowerVR device structurally cannot.
+
+3. **Open "Upstream state of bevy_ui on Android"** (`research`, AFK) — is #14710
+   actually closed, against which wgpu, and are there existing reports of
+   `bevy_ui` corruption on PowerVR/Tensor hardware? Independent of the device,
+   so it can run in parallel from the moment it exists. Research tickets are the
+   one type a session may resolve several of.
+
+4. **Rewiring.** [Low-end Android performance budget](14-android-performance-budget.md)
+   becomes takeable as soon as this ticket resolves. Ticket 13's amendment — and
+   any reconsideration of tickets 02 and 10 — blocks on the new prototype ticket
+   instead of on this one.
+
+#### What splitting does not do
+
+It does not downgrade probe F. `bevy_ui` failing on Android is serious and, on
+current evidence, **must be fixed regardless of which vendors it affects** — the
+Pixel is a mainstream handset and a shipping target, so a PowerVR-only bug is
+still a shipping bug. The split moves it somewhere it can be worked properly,
+rather than leaving it as the last unchecked box on a ticket whose own question
+was answered hours ago.

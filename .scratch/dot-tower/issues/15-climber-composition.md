@@ -1,7 +1,7 @@
 # Climber composition and the per-type caps
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: 06
 
 ## Question
@@ -133,3 +133,105 @@ What this does to the questions above:
 - Ranged reach is **not** available as a composition lever, and the reason is worth carrying: it
   makes ranged fire-and-forget, dropping its share of all healing from 23% to 2% and removing it
   from the sustain economy — deleting a composition interaction rather than creating one.
+
+## Answer
+
+**Composition is authored, not chosen.** The three climber types spawn in a fixed ratio the player
+never sets, and the game has four decisions — rank, locks, which hero, when its abilities fire —
+not five. Recorded as
+[ADR 0011](../../../docs/adr/0011-composition-is-authored.md).
+
+This ticket has been carrying the assumption since charting that composition is a player decision.
+Two tickets' worth of measurement now say it never was, and the machinery to make it one does not
+exist: ticket 19 showed type identity cannot be expressed through survival, and the measurements
+below show it cannot be expressed through the mix either.
+
+### The mix is a wide flat basin, and at depth it is nothing
+
+Eleven splits of a fixed 90-climber budget, every run pinned to identical wall-clock time:
+
+| | run 1, locks as shipped | run 1, locks fixed | run 6, locks fixed |
+|---|---|---|---|
+| best split | 149 (20/40/30) | 156 (30/30/30) | 1232 (70/10/10) |
+| baseline 40/30/20 | 147 | 148 | 1230 |
+| worst split | 122 (10/70/10) | 131 (10/10/70) | 1224 (10/70/10) |
+| **spread** | **22.1%** | **19.1%** | **0.7%** |
+
+Across spending strategies — buy-cheapest, buy-even, all-in on one type for a whole run — the
+spread is 140 to 148 in run 1 and 738 to 749 at depth. **Question 3 is answered: gold competition
+is not sufficient, and it is not close.** Rank cost at 1.30/rank rises fast enough that income
+forces you to buy all three regardless of intent; ranks land at 55/54/53 whatever the player does.
+
+The `0.7%` is the number that decides the ticket. **Composition matters while you are weak and
+stops mattering once you are strong**, so as a decision it would be one that *expires* — the worst
+possible shape in an idle game whose player is meant to still be deciding things at depth. This
+was checked specifically against the suspicion that the late game's inertness was the lock curve's
+fault; it is not. Fixing the lock curve makes composition **more** inert, not less.
+
+Each type does earn its place — removing one costs 12.9% (melee), 11.6% (ranged), 20.4% (healer).
+The stream needs all three. It does not need the player to decide the mix.
+
+### What the types are for (question 4, inverted)
+
+**Legibility.** The tower has to read as an army fighting: melee falling at the front, archers
+behind, healers keeping them up. A homogeneous stream would make the wall unreadable, and the wall
+is the thing the player is watching. That is a legitimate reason under this map's standing rule
+that legibility has veto power — the same reasoning that took ticket 16's aura to ±0 when ±0
+through ±5 measured identically — but it has to be written down, or a future contributor will find
+three types with no strategic difference and conclude they should be merged or given one.
+
+The division of labour is real but incidental: melee is the health pool, ranged is the damage,
+healer is the sustain. It makes one gold axis legible — rank buys *more army*, and the army has
+parts.
+
+### Settled
+
+- **Caps are never purchasable with gold** (question 1). Raising every cap is a monotonic,
+  saturating power increase (×5 → +15.6%) that is indifferent to the split, so as a gold axis it
+  competes with rank while doing rank's job. Rank stays the single gold-bought power axis, exactly
+  as [ADR 0005](../../../docs/adr/0005-the-hero-multiplies-climbers-add.md) keeps the aura off it.
+- **One global replacement interval plus an authored ratio**, replacing three caps and three
+  intervals. Six numbers were quietly steering three unrelated things — the ratio, the run-length
+  dial (ticket 06) and the survival dial (ticket 19). One interval decouples them, so ticket 17 can
+  move run length without moving composition. Caps stay per type as a **ceiling**, and under the
+  fixed lock curve they stop binding entirely (40/30/20 with 3/3/3 alive).
+- **At the cap the spawn is skipped** (question 6) — and with a ratio there is nothing to skip.
+  Passing the slot to another type would let an invisible rule rewrite the authored ratio, drifting
+  it toward whatever the replacement machinery is churning: composition set by an accident of
+  scheduling.
+- **The ratio is authored to read as an army, not tuned to the optimum** (question 2). Near-equal
+  measures best and an army that is one-third medics does not read like one; the mechanical
+  difference expires and the fantasy does not. The integers themselves are authoring rather than
+  deciding, and wait on ticket 20 to say how big the crowd is — left in the map's fog.
+- **The player never sees the mix as a number** (question 4). No panel, no readout; the tower
+  column is the display. With locks fixed the whole stream is 42 climbers in run 1 and **9 at
+  depth**, all within a floor of the wall — directly countable. This makes telling the three types
+  apart at a glance load-bearing rather than a nicety, graduated out of the fog as ticket 21.
+
+### Question 5 is withdrawn rather than answered
+
+Ticket 11 confirmed relics move composition through `type cap` and `type stat`. Both are now
+measured as near-inert. Ticket 19 took `type stat` down to damage-only — a survivability relic is
+beneath the noise floor, because replacement compresses a 10× health swing into 1.3× of survival.
+And `type cap` is worth **0.0% for melee and 0.0% for ranged** at three times the cap; only the
+healer's does anything (×2 → +4.1%, ×3 → +5.4%), because single-target healing means the twentieth
+healer still adds a full unit of sustain while damage saturates against the curve.
+
+**`type cap` is retired from the closed enum.** A closed vocabulary earns its closedness by every
+entry being real, and "cap, but only the healer's" documents a tuning accident rather than a design
+axis. [ADR 0009](../../../docs/adr/0009-relic-effects-avoid-axes-the-curve-erases.md) amended. The healer's marginal
+value is kept as a *finding* — it is where the slack in the column is — but not as vocabulary.
+This leaves ticket 11's type-affinity story needing a rethink, since both of its axes are now gone
+or narrowed; that is in the fog with the relic catalogue, not solved here.
+
+### Carried to ticket 20
+
+The lock curve was going to block this ticket and no longer does — composition is inert under both
+curves, so the answer did not need it. But the finding that came out of chasing it is the largest
+on the board, and it is ticket 20's: **at depth the game is travel time, not combat.** ×10 climber
+damage moves the peak floor by nothing (749 → 749). The only thing that moves it is the lock line.
+The second half matters as much as the first: the provisional fix trades a long walk with a big
+crowd for **no walk and almost no crowd** (9 climbers at depth), and neither is "an endless stream
+of climbers".
+
+Prototype: `.scratch/dot-tower/prototypes/15-composition/`.

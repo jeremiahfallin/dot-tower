@@ -76,8 +76,23 @@ distinguishes one from another, alongside its abilities and its health.
 _Avoid_: Aggro, threat, provoke
 
 **Type cap**:
-The maximum number of live climbers of a single climber type. Each type has its own; there is no cap across the stream as a whole.
+A **ceiling** on the number of live climbers of a single climber type. Each type has its own; there
+is no cap across the stream as a whole. It is not a lever: it is never bought with gold, and under
+a healthy lock curve it does not bind at all — the stream sits well below it.
 _Avoid_: Population cap, unit limit, squad size
+
+**Composition**:
+The ratio of climber types in the stream. It is **authored** — a fixed design statement the player
+never sets, chosen to make the tower read as an army rather than tuned to an optimum. Composition
+is not one of the game's decisions, and describing it as a choice is a category error.
+_Avoid_: Party, loadout, army mix, squad
+
+**Replacement**:
+The single global interval at which a fallen climber is replaced. One interval for the whole
+stream, applied against the authored **composition** — deliberately not one per climber type,
+which would make the ratio emergent from six numbers instead of stated in one. It is the dial that
+sets run length, and the rate at which climbers die is a consequence of it rather than of combat.
+_Avoid_: Replacement rate, replacement interval (both retired in favour of the bare term), respawn (that is the enemy repopulation timer), spawn rate
 
 **Ability**:
 One of four cooldown-gated actions a hero possesses, fired manually by the player. There is no mana or energy resource.

@@ -31,3 +31,22 @@ soup of stacked modifiers.
 - **This is why relic ranks exist and are not just more relics.** Depth on a flat axis has to come
   from ranking one relic up, since a second relic on the same axis is forbidden by the
   one-relic-per-axis rule.
+
+## Amendment — `type cap` retired (ticket 15)
+
+`type cap` was one of the two axes reserved for type affinity. Measured, it is beneath this ADR's
+own noise floor for two of the three types: at **three times** the cap, melee is worth 0.0% and
+ranged 0.0%. Only the healer's does anything (×2 → +4.1%, ×3 → +5.4%), because single-target
+healing means the twentieth healer still adds a full unit of sustain while damage saturates
+against the difficulty curve.
+
+It is **retired from the closed enum** rather than kept as a healer-only entry. A closed
+vocabulary earns its closedness by every entry being real, and "cap, but only the healer's"
+documents a tuning accident rather than a design axis. The healer's marginal value is kept as a
+finding — it is where the slack in the column is — but not as vocabulary.
+
+This leaves type affinity with neither axis intact: [0010](0010-combat-is-floor-local-and-has-no-reach.md)
+already narrowed `type stat` to damage by showing a survivability relic is beneath the noise floor
+too, since replacement compresses a 10× health swing into 1.3× of survival. What a relic that
+"favours ranged climbers" can actually do is now an open question, and it sits in the map's fog
+with the relic catalogue.

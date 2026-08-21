@@ -32,6 +32,13 @@ export const DEFAULTS = {
                              // The model has never done this; false is what tickets 06-16 measured.
   auraFloors: 1,             // heal reaches same floor +/- N
   healPolicy: 'lowestFraction',        // which targeting policy the healer runs -- see HEAL_POLICIES
+  buyPolicy: 'cheapest',     // ticket 15: how the player spends. 'cheapest' is what 06 measured --
+                             // buy whatever you can afford, forever. The others are the strategies
+                             // a player would actually try, and the spread between them is the
+                             // answer to "is gold competition a real decision?"
+                             // 'melee' | 'ranged' | 'healer' = rank one type first, always
+                             // 'even'  = keep the three ranks level
+                             // 'noLock' = cheapest, but never buy a lock
   healSelf: true,            // may a healer be its own target?
   healHero: true,            // is the hero in the candidate set at all?
 
@@ -138,6 +145,14 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
       const nextLockFloor = 10 * (lockLevel + 1);
       if (peak >= nextLockFloor + c.lockMargin) opts.push({ kind: 'lock', cost: lockCost(c, lockLevel + 1), floor: nextLockFloor });
       opts.sort((a, b) => a.cost - b.cost);
+      // The spending strategy reorders the options; affordability still decides.
+      const pol = c.buyPolicy;
+      if (pol === 'noLock') { const i = opts.findIndex((o) => o.kind === 'lock'); if (i >= 0) opts.splice(i, 1); }
+      else if (pol === 'even') {
+        opts.sort((a, b) => (a.kind === 'rank' ? ranks[a.ty] : 1e9) - (b.kind === 'rank' ? ranks[b.ty] : 1e9));
+      } else if (pol === 'melee' || pol === 'ranged' || pol === 'healer') {
+        opts.sort((a, b) => (a.kind === 'rank' && a.ty === pol ? -1 : 0) - (b.kind === 'rank' && b.ty === pol ? -1 : 0));
+      }
       const pick = opts.find((o) => o.cost <= gold);
       if (!pick) return;
       gold -= pick.cost;

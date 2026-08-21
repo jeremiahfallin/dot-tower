@@ -9,10 +9,20 @@ agp = "8.13.2"
 # so this tracks Bevy's tested value rather than the newest release (4.4.2).
 gamesActivity = "4.4.0"
 appcompat = "1.7.0"
+# Not a Kotlin project — this pins the stdlib only to break a duplicate-class
+# collision. appcompat 1.7.0 -> lifecycle-common 2.6.2 ->
+# kotlinx-coroutines-android 1.6.4 still asks for kotlin-stdlib-jdk7/jdk8 1.6.21,
+# whose classes were merged into kotlin-stdlib itself in Kotlin 1.8.0. Alongside
+# the 1.8.22 kotlin-stdlib already on the classpath that fails
+# :app:checkDebugDuplicateClasses. At 1.8.22 the jdk7/jdk8 artifacts are empty
+# shims delegating to kotlin-stdlib, so the duplicates vanish.
+kotlin = "1.8.22"
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 games-activity = { group = "androidx.games", name = "games-activity", version.ref = "gamesActivity" }
+kotlin-stdlib-jdk7 = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib-jdk7", version.ref = "kotlin" }
+kotlin-stdlib-jdk8 = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib-jdk8", version.ref = "kotlin" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

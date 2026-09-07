@@ -1,0 +1,47 @@
+; dot-tower — Godot probe harness.
+;
+; The Godot counterpart of the Bevy bringup harness in src/lib.rs, carrying the
+; same probes A–F so the two can be compared on the same handset. See README.md.
+
+config_version=5
+
+[application]
+
+config/name="dot-tower godot probe"
+config/description="Ticket 04 probes A-F, rebuilt on Godot to isolate probe F."
+run/main_scene="res://probe.tscn"
+config/features=PackedStringArray("4.7")
+
+[display]
+
+; Portrait phone shape, so the desktop window is a stand-in for the device —
+; the same premise as the Bevy harness. Ticket 02 settled that layout branches
+; on aspect ratio, never on the platform, which keeps this testable on desktop.
+window/size/viewport_width=480
+window/size/viewport_height=960
+; Disabled, not "canvas_items": we want a 1:1 viewport at the device's real
+; resolution so probe D controls scale explicitly rather than inheriting it.
+window/stretch/mode="disabled"
+window/handheld/orientation=1
+
+[input_devices]
+
+; Lets the desktop window exercise the touch path with one finger.
+pointing/emulate_touch_from_mouse=true
+; The reverse direction is OFF. Godot emulates a mouse from the FIRST touch
+; only, and a mouse has one pointer — leaving it on lets a four-finger press
+; arrive at the widget layer as one cursor, which is the very failure probe B
+; exists to detect. Off, the Controls see the touches themselves.
+pointing/emulate_mouse_from_touch=false
+
+[rendering]
+
+; The comparison that matters. "mobile" is Vulkan — apples-to-apples with the
+; Bevy harness, which compiled no GLES backend at all. scripts/run.sh --renderer
+; gl_compatibility switches this to GLES3, which is the fallback Bevy does not
+; have. Do not hand-edit; run.sh rewrites this line.
+renderer/rendering_method="forward_plus"
+renderer/rendering_method.mobile="mobile"
+; Pixel art: nearest filtering and no 2D MSAA, per ticket 02's day-one settings.
+textures/canvas_textures/default_texture_filter=0
+anti_aliasing/quality/msaa_2d=0

@@ -64,6 +64,13 @@ export const DEFAULTS = {
   prestigeMode: 'compound', // 'bestPeak' = M is a function of best-ever peak (does not compound)
                             // 'compound' = each run's multiplier multiplies the last
   stallMinutes: 6,           // peak flat this long => the run is over
+
+  // --- entity accounting (ticket 14) ---
+  // Ticket 03: a floor is inert DATA until a climber comes "within a floor or
+  // two", at which point its pack spawns as entities and despawns behind them.
+  // This is that radius, made explicit so the bound can be measured rather than
+  // asserted. It affects instrumentation only -- no simulation behaviour reads it.
+  activationRadius: 2,
 };
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -121,6 +128,34 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
   const samples = [];
   const events = [];
   const wallHistory = [];
+
+  // Ticket 14 instrumentation. Read-only over `floors`: materialising a floor
+  // record here would change the memory profile and the respawn behaviour we
+  // are trying to measure, so an untouched floor is counted as a full pack
+  // without being inserted.
+  const R = c.activationRadius ?? 2;
+  let prevActive = new Set();
+  let activations = 0, deactivations = 0, churnSince = 0;
+
+  function activeFloorSet() {
+    const act = new Set();
+    for (const cl of climbers) {
+      for (let f = Math.max(lockLine(), cl.floor - R); f <= cl.floor + R; f++) act.add(f);
+    }
+    if (t >= heroDeadUntil) {
+      for (let f = Math.max(lockLine(), heroFloor - R); f <= heroFloor + R; f++) act.add(f);
+    }
+    return act;
+  }
+
+  function enemyEntitiesIn(act) {
+    let n = 0;
+    for (const f of act) {
+      const st = floors.get(f);
+      n += st ? st.count : c.packSize;   // untouched floor => full pack, not materialised
+    }
+    return n;
+  }
 
   const lockLine = () => 10 * lockLevel + (lockLevel > 0 ? 1 : 0);
 
@@ -415,6 +450,16 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
     // --- decisions ---
     if (t - lastDecision >= 1) { purchase(); lastDecision = t; }
 
+    // --- entity churn (ticket 14) ---
+    // Counted every tick, not every sample: activation cost is paid per
+    // transition, so sampling it at 10s intervals would miss almost all of it.
+    {
+      const act = activeFloorSet();
+      for (const f of act) if (!prevActive.has(f)) activations++;
+      for (const f of prevActive) if (!act.has(f)) deactivations++;
+      prevActive = act;
+    }
+
     // --- sampling ---
     if (t - lastSample >= sampleEvery) {
       const w = currentWall();
@@ -433,12 +478,36 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
         const n = popByType[ty] || 1;
         hpByType[ty] /= n; backByType[ty] /= n;
       }
+      // --- ticket 14: what this instant would cost as entities ---
+      const act = activeFloorSet();
+      const enemyEntities = enemyEntitiesIn(act);
+      const occupied = new Set(climbers.map((cl) => cl.floor));
+      let contested = 0;
+      for (const f of occupied) {
+        const st = floors.get(f);
+        if (!st || st.count > 0) contested++;   // climbers present AND enemies present
+      }
+      let lo = Infinity, hi = -Infinity;
+      for (const cl of climbers) { if (cl.floor < lo) lo = cl.floor; if (cl.floor > hi) hi = cl.floor; }
+      const elapsed = Math.max(t - churnSince, dt);
+
       samples.push({
         t, gold, goldEarned, peak, wall: w, wallHp, lockLine: lockLine(), sealedRate,
         pop: climbers.length, popByType, hpByType, backByType, deaths, kills,
         ranks: { ...ranks }, heroLevel, heroFloor,
         gps: goldEarned / Math.max(t, 1),
+        // ticket 14
+        activeFloors: act.size,
+        occupiedFloors: occupied.size,
+        contestedFloors: contested,
+        climberSpread: climbers.length ? hi - lo + 1 : 0,
+        enemyEntities,
+        entities: enemyEntities + climbers.length + (t >= heroDeadUntil ? 1 : 0),
+        floorRecords: floors.size,
+        activationsPerSec: activations / elapsed,
+        deactivationsPerSec: deactivations / elapsed,
       });
+      activations = 0; deactivations = 0; churnSince = t;
       wallHistory.push(currentWall());
       lastSample = t;
     }

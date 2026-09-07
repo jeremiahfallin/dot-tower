@@ -119,3 +119,17 @@ wrong in the shipped design rather than the superseded one.
 
 None is blocked by [ticket 22](22-bevy-ui-android-rendering.md): all four are read
 off logcat, not off the HUD that does not render.
+
+#### The cold build ticket 04 owed
+
+Measured here because it needed no device. **8m 07s** wall for a cold
+`aarch64-linux-android` debug build (2,896s CPU across ~5.9 cores), producing the
+1.4 GB unstripped `.so` ticket 04 already recorded. Built into a separate
+`CARGO_TARGET_DIR` so the working cache was not destroyed to get the number;
+11 GB of intermediates, discarded afterwards.
+
+Ticket 04's table is updated in place. The practical consequence for anyone
+working this ticket: an incremental Rust change is cheap, but a `cargo clean`, a
+toolchain bump or a `Cargo.toml` feature edit costs eight minutes before Gradle's
+16s even starts — so batch the device experiments rather than rebuilding between
+each one.

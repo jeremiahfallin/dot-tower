@@ -196,7 +196,7 @@ chain works end to end.
 | `.so` in APK (AGP-stripped) | 75 MB |
 | APK | 79 MB |
 | Gradle | 16s incremental (36 tasks) |
-| Rust cdylib, cold for `aarch64-linux-android` | **not precisely timed** — record on a clean rebuild |
+| Rust cdylib, cold for `aarch64-linux-android` | **8m 07s** wall (2,896s CPU, ~5.9x parallel), debug profile — measured 2026-09-07 by ticket 14 |
 
 **The Android code paths compile.** Ticket 04 previously recorded every
 `cfg(target_os = "android")` path as compile-unverified for want of an NDK.

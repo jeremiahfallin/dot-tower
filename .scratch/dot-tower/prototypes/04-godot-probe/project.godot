@@ -45,3 +45,7 @@ renderer/rendering_method.mobile="mobile"
 ; Pixel art: nearest filtering and no 2D MSAA, per ticket 02's day-one settings.
 textures/canvas_textures/default_texture_filter=0
 anti_aliasing/quality/msaa_2d=0
+; Required for Android export — the exporter refuses the preset without it.
+; Not something a hand-written project.godot gets for free: the editor sets it
+; when you add an Android preset through the GUI, and we never opened the GUI.
+textures/vram_compression/import_etc2_astc=true

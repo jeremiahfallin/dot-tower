@@ -1,7 +1,7 @@
 # Bevy hello-world on a physical Android device
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 01
 
 ## Question
@@ -26,6 +26,67 @@ Two questions that could not be settled from source and need real hardware:
 Verify the save-durability chain empirically: log timestamps either side of the save write in the `AppLifecycle::Suspended` handler and compare against logcat lifecycle lines. Each link is verified in source; the composition is inference.
 
 Also note Bevy's example Gradle targets API 33, while Google Play requires API 36 for updates from **2026-08-31**. Bringup should target API 36 rather than inheriting the example's config.
+
+## Answer
+
+**Resolved.** A minimal Bevy 2D app builds, installs, launches and takes touch
+input on a physical Android device. The toolchain is recorded, the build chain
+works end to end, and the two probes that do not depend on the UI layer both
+pass.
+
+**Toolchain that worked.** `cargo-ndk` 4.1.2 + Gradle with `GameActivity`, Rust
+1.97.1, NDK 30.0.15729638, compileSdk/targetSdk 36, Gradle wrapper pinned to
+8.14.3 (AGP 8.13.2 cannot run on Homebrew's Gradle 9.7.1). Commands are
+`scripts/android-setup.sh`, `scripts/android-build.sh`, `scripts/android-run.sh`.
+
+**Device.** Pixel 10 Pro, Android 17 / API 37, Tensor G5 with a PowerVR D-Series
+DXT-48-1536 MC1 on the Vulkan backend, 8 cores / 15.2 GiB. Gradle 16s
+incremental; the cold Rust cdylib build was never timed and is owed to
+[ticket 14](14-android-performance-budget.md), which needs a clean rebuild anyway.
+
+**Probe A — touch transport: pass, partially read.** Press and drag moves the
+sprite on device. `max_fingers = 1` is the only reading captured; the edge
+coordinates and the multi-finger maximum are printed on a HUD that does not
+render, and go to [ticket 22](22-bevy-ui-android-rendering.md).
+
+**Probe E — save durability: pass, and it closes ticket 01's inference.**
+`AppLifecycle::Suspended` is a genuine synchronous save hook: the write plus
+`sync_all()` completed in **2 ms**, comfortably inside a 16.7 ms frame, and the
+file was verified on device via `run-as`. `WillSuspend` was **never delivered**,
+exactly as [ticket 01](01-bevy-android-support.md) predicted — had it appeared,
+[ticket 12](12-save-schema.md)'s design would have needed reworking. It stands.
+`internal_data_path()` resolves to `/data/user/0/dev.dottower/files/`, confirming
+on hardware the writable location ticket 12 asserted from source.
+
+**Every `cfg(target_os = "android")` path now compiles**, including
+`content_rect()` and `internal_data_path()`, which ticket 04 previously had to
+record as compile-unverified for want of an NDK.
+
+**Four build-chain defects, all fixed and all scripting faults** — none was Bevy,
+the NDK, or the device: an ungeneratable Gradle wrapper (AGP 8.13.2 versus Gradle
+9.7.1), unquoted `.env` values breaking every `source` under `set -euo pipefail`,
+macOS bash 3.2 aborting on empty-array expansion under `set -u`, and a Kotlin
+stdlib duplicate-class collision in a project that uses no Kotlin. Details in the
+comments below; they are the kind of thing that only appears on a real machine
+and would cost the next person a day.
+
+**What this ticket did not settle, and where it went.** `bevy_ui` does not render
+on this device, which took probes B, C and D down with it and left probe A half
+read. That is an open-ended graphics investigation rather than a bringup detail,
+so it moved to [ticket 22](22-bevy-ui-android-rendering.md) (prototype) together
+with every reading gated behind it — **including probes C and D, which ticket 02
+added here** — and [ticket 23](23-upstream-bevy-ui-android.md) (research) covers
+the upstream half in parallel. Ticket 22 also inherits the consequences ticket 04
+was holding for [ticket 13](13-bevy-version-target.md)'s reasoning and for the UI
+foundation in tickets 02 and 10.
+
+One finding from probe C stands regardless of how that resolves: winit logs
+`TODO: handle Android InsetsChanged` and `TODO: find a way to notify application
+of content rect change`, so insets and content-rect changes are **never delivered
+to the application**. The safe-area handling ticket 02 budgeted at ~40 lines must
+**poll** `AndroidApp::content_rect()`; it cannot be event-driven.
+
+Status: resolved
 
 ## Comments
 
@@ -402,3 +463,29 @@ Pixel is a mainstream handset and a shipping target, so a PowerVR-only bug is
 still a shipping bug. The split moves it somewhere it can be worked properly,
 rather than leaving it as the last unchecked box on a ticket whose own question
 was answered hours ago.
+
+### Split executed (session of 2026-09-07)
+
+The proposal above is no longer a proposal. Ticket 04 is resolved on its own
+question; [ticket 22](22-bevy-ui-android-rendering.md) and
+[ticket 23](23-upstream-bevy-ui-android.md) are open and carry everything that
+was gated behind probe F. [Ticket 14](14-android-performance-budget.md) lists
+only this ticket as a blocker and is therefore takeable now — it needs a
+hello-world that runs and takes touch input, which exists, and it never needed a
+working UI layer.
+
+One thing changed since the proposal was written, and it changes ticket 22's
+opening move. A **Godot probe harness carrying the same probes A-F** now exists
+at [`prototypes/04-godot-probe/`](../prototypes/04-godot-probe/), with its export
+chain verified end to end and a signed APK under a package id distinct from this
+harness's, so both can sit on the phone at once. It was built to answer a
+different question — whether the project would be easier in Godot — but as an
+instrument it is a **cross-engine control** for probe F: if Godot composites a UI
+layer correctly on this device, the device and driver are exonerated and the
+fault is Bevy's; if it corrupts too, probe F is not a Bevy problem at all. That
+is a sharper first cut than anything in the original list and it needs no second
+handset, so it leads ticket 22's first moves.
+
+The engine question itself is **not** settled and is not what ticket 22 is for.
+Nothing in the design work is engine-specific — no ADR and no other ticket turns
+on it — so the choice can wait for probe F rather than front-run it.

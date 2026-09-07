@@ -77,3 +77,19 @@ yielded an app with **no working UI input at all**, failing silently.
 Also confirmed while building against it: **Bevy 0.19.1 declares
 `rust-version = "1.95.0"`.** This machine was on 1.89.0 and could not have
 compiled it. Now on 1.97.1; `rust-toolchain.toml` pins the channel.
+
+## Amended by ticket 04: the deciding reason is unverified on hardware
+
+This ticket chose 0.19.1 over 0.18 on a single argument — that #14710 (bevy_ui
+Android flicker) was fixed transitively via wgpu 29, which 0.18 pins too old to
+receive. On the bringup handset, **`bevy_ui` does not render correctly at all**.
+
+The choice is not overturned: 0.19.1 remains at least as good as 0.18, and
+nothing observed argues for going back. What is in doubt is the *reason*. The fix
+that justified the upgrade is not observable on this device.
+
+Whether this ticket needs a real amendment now waits on
+[ticket 22](22-bevy-ui-android-rendering.md), not on ticket 04 — specifically on
+its 0.18-versus-0.19 comparison and its second-GPU-vendor test. A PowerVR-only
+bug would leave this ticket's reasoning intact; a 0.19 regression would make the
+decision actively harmful.

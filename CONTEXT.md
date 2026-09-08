@@ -112,9 +112,18 @@ _Avoid_: Tower view, viewport, playfield, stage
 
 **Strip**:
 The single band above the ability bar carrying everything temporal — hero uptime over the last
-45 seconds, a record of ability presses, and a plain-language verdict on the most recent one.
-Everything spatial belongs on the **tower column** instead, and nothing appears in both.
+45 seconds, a record of ability presses, a plain-language verdict on the most recent one, and
+the run's running earned-state (new floors and earned multiplier so far this run). Everything
+spatial belongs on the **tower column** instead, and nothing appears in both.
 _Avoid_: HUD, status bar, panel, ticker
+
+**Record**:
+The line on the **tower column** marking the account's deepest-ever floor. A run earns nothing
+until it passes the record — the **prestige multiplier** pays for new territory only — so the
+record is both the run's target and its end: the moment the climb crosses it is the moment
+prestige starts being worth anything. It is not the **wall**; the record is where the account
+has been, not where the climb is stuck.
+_Avoid_: Best-ever, high-water mark, personal best, marker line
 
 ### Progression
 

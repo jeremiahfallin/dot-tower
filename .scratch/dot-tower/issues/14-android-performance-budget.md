@@ -85,30 +85,46 @@ reaches floor 1,097. The largest band seen was 399.
 hypothetical 5,000 floors is **78 KiB**; 50,000 floors is 781 KiB. Nothing to
 budget.
 
-#### A finding that is not about performance, and belongs to ticket 20
+#### Re-measured on ticket 15's mechanism — and the earlier reading here was wrong
 
-Population sits at **exactly 90 in every run** — the sum of the three per-type
-caps. Raising the ceiling: 180 → 270 entities, 360 → 366, then it **saturates**,
-with 720 and 1440 producing identical runs because population is spawn rate times
-lifetime and the ceiling has stopped touching it.
+Everything above was first measured on the **superseded** mechanism (three
+per-type caps, three per-type spawn intervals). The model now runs
+[ticket 15](15-climber-composition.md)'s actual design — one global replacement
+interval against an authored ratio, caps surviving only as a ceiling — and the
+numbers were re-taken.
 
-So `CONTEXT.md`'s **Type cap** entry — *"under a healthy lock curve it does not
-bind at all — the stream sits well below it"* — is **false at the current value
-of 90** and true from roughly 360 up. **Not acted on, and the glossary is
-deliberately not edited**, for two reasons:
+**The performance conclusions are unmoved.** Max entities 205 → **201**, mean
+129 → 126, churn mean 2.03 → 1.87/s. Band height still buys nothing: ×1 → ×10¹²
+grows the band 6× and entities 1.04×. The 200–450 range stands.
 
-1. The model still runs the **superseded** mechanism — three caps and three spawn
-   intervals. [Ticket 15](15-climber-composition.md) replaced it with one global
-   replacement interval against an authored ratio. The *shape* of the question
-   survives that change; the values do not.
-2. Crowd size belongs to [ticket 20](20-travel-time-and-the-lock-curve.md),
-   which is open and owns "how big the crowd is and how far it walks".
+**The claim about `CONTEXT.md` does not.** This ticket previously recorded that
+the **Type cap** entry — *"under a healthy lock curve it does not bind at all"* —
+is "false at the current value of 90". That was an artefact of measuring the old
+mechanism under the default lock curve. On the real mechanism:
 
-The number ticket 20 will want: with no ceiling binding, the crowd settles near
-**405 climbers** and the whole simulation costs **~436 entities** — still under
-40% of the 1,100 prediction. Whoever updates the model to ticket 15's mechanism
-should re-run `entities.mjs`; it is the check that would catch this claim being
-wrong in the shipped design rather than the superseded one.
+| lock curve | run | peak | crowd | m/r/h | cap skips/sample |
+|---|---|---|---|---|---|
+| default (`lockCostBase` 4.0) | 1 | 147 | 82 | 37/27/18 | 2.90 |
+| default (4.0) | 6 | 750 | 87 | 39/29/19 | 4.15 |
+| **fixed (2.5)** | 1 | 142 | 34 | 15/11/8 | **0.00** |
+| **fixed (2.5)** | 6 | 1220 | 9 | **4/3/2** | **0.00** |
+
+`CONTEXT.md` is **right**, and right in a more specific way than it says: the
+ceiling does not bind at all under a healthy lock curve, and binds constantly
+under the current one. Under the fixed curve the live mix settles on the authored
+ratio **exactly** — 4/3/2, which is what "authored" is supposed to mean — and
+reproduces ticket 15's predicted 9 climbers at depth on the mechanism it
+specified rather than the one it measured.
+
+So the glossary needs no edit. What it needs is [ticket 20](20-travel-time-and-the-lock-curve.md)
+to land the lock curve, because **ADR 0011's central claim is conditional on it**.
+Under the default curve the cap *is* the crowd dial, which is the one thing
+ADR 0011 says it must never be.
+
+One consequence for this ticket's own subject: with `replacement` swept 0.5s →
+5.0s the tail crowd only moves 88 → 81, because the ceiling is absorbing the
+difference. **The crowd dial does not currently work**, and entity demand is
+therefore being set by a number ADR 0011 says is not a lever.
 
 #### What remains, and it all needs the device
 

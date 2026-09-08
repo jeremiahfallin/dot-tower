@@ -135,37 +135,56 @@ console.log('climbers walk through ground the leaders already cleared. Spread co
 console.log('activation events, not entities -- and the events are cheap.');
 
 // ---------------------------------------------------------------------------
-console.log('\n=== 4. How hard is this pinned to the crowd size? ===');
-console.log('Population sits at exactly 90 in every run above -- the sum of the three');
-console.log('per-type caps. That mechanism is GONE: ticket 15 replaced three caps and');
-console.log('three intervals with one global replacement interval against an authored');
-console.log('ratio, and how big the crowd actually is belongs to ticket 20, still open.');
-console.log('So the number that matters is not 90, it is the slope.\n');
+console.log('\n=== 4. What sets the crowd, and does the ceiling bind? ===');
+console.log('The model now runs ticket 15\'s mechanism: ONE global replacement');
+console.log('interval against an authored ratio, with per-type caps surviving only as');
+console.log('a ceiling that ADR 0011 says should never bind. So `replacement` is the');
+console.log('crowd dial, not the caps -- and whether the ceiling binds is testable.\n');
 
-console.log('crowd  entities(max)  enemies  active(max)  churn/s');
-for (const mult of [1, 2, 4, 8, 16]) {
-  const c = base();
-  for (const ty of ['melee', 'ranged', 'healer']) c.types[ty].cap *= mult;
+console.log('replacement  crowd  entities(max)  active(max)  churn/s  capSkips/sample');
+for (const rep of [0.5, 1.0, 1.67, 3.0, 5.0]) {
+  const c = base(); c.replacement = rep;
   const r = simulateRun(c, { prestigeMult: 1e4, maxSeconds: HOURS });
   const st = stats([r]);
+  const skips = mean(r.samples.map((s) => s.capSkips));
+  // Tail average, not the high-water mark: every run touches the ceiling at
+  // some point under the default lock curve, so a max would read 90 throughout
+  // and hide the very thing this table is for.
+  const tail = r.samples.slice(Math.floor(r.samples.length * 0.6));
+  const crowd = mean(tail.map((s) => s.pop));
   console.log(
-    String(90 * mult).padStart(5) +
+    rep.toFixed(2).padStart(11) +
+    crowd.toFixed(0).padStart(7) +
     String(st.entitiesMax).padStart(15) +
-    String(st.worst.enemyEntities).padStart(9) +
     String(st.activeMax).padStart(13) +
-    st.churnMean.toFixed(2).padStart(9)
+    st.churnMean.toFixed(2).padStart(9) +
+    skips.toFixed(2).padStart(17)
   );
 }
-console.log('\nIt SATURATES. Raising the ceiling past ~360 changes nothing: 720 and');
-console.log('1440 give identical runs, because population is spawn rate times lifetime');
-console.log('and the ceiling has stopped binding. That is CONTEXT.md\'s claim about the');
-console.log('type cap -- "under a healthy lock curve it does not bind at all" -- shown');
-console.log('directly, and it is false at the CURRENT value of 90, where population sits');
-console.log('pinned at the ceiling in every run, and true from roughly 360 up.');
-console.log('');
-console.log('The number ticket 20 needs: left to spawn interval and lifetime alone, the');
-console.log('crowd settles near 405 climbers and the whole simulation costs ~436');
-console.log('entities -- still under 40% of the 1,100 prediction with no ceiling at all.');
+
+console.log('\n--- and the ceiling, under both lock curves ---');
+console.log('Ticket 15 predicted the cap "stops binding entirely" under the FIXED lock');
+console.log('curve (lockCostBase 2.5), which is ticket 20\'s open work.\n');
+console.log('lock curve      run    peak   crowd   m/r/h     capSkips/sample');
+for (const fixed of [false, true]) {
+  const mk = () => { const c = base(); c.stallMinutes = 1e9; if (fixed) c.lockCostBase = 2.5; return c; };
+  const warm = simulateCampaign(mk(), 5, { maxSeconds: 90 * 60 });
+  for (const [lbl, M, mins] of [['run 1', 1, 40], ['run 6', warm[4].prestigeMultOut, 60]]) {
+    const r = simulateRun(mk(), { prestigeMult: M, maxSeconds: mins * 60 });
+    const tail = r.samples.slice(Math.floor(r.samples.length * 0.6));
+    const avg = (f) => tail.reduce((a, s) => a + f(s), 0) / (tail.length || 1);
+    const mix = ['melee', 'ranged', 'healer'].map((t) => avg((s) => s.popByType[t]).toFixed(0)).join('/');
+    console.log(
+      (fixed ? 'FIXED (2.5)' : 'default (4.0)').padEnd(15) + lbl.padEnd(7) +
+      String(r.peak).padStart(6) + avg((s) => s.pop).toFixed(0).padStart(8) +
+      mix.padStart(9) + avg((s) => s.capSkips).toFixed(2).padStart(16)
+    );
+  }
+}
+console.log('\nADR 0011 is right, and it is CONDITIONAL on the lock curve. Under the');
+console.log('default curve the ceiling binds constantly and the crowd is pinned at 90.');
+console.log('Under the fixed curve it never binds once and the live mix settles on the');
+console.log('authored ratio exactly -- which is what "authored" is supposed to mean.');
 
 // ---------------------------------------------------------------------------
 console.log('\n=== 5. Memory for inert floor data (Q5) ===');

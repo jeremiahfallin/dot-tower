@@ -235,3 +235,40 @@ crowd for **no walk and almost no crowd** (9 climbers at depth), and neither is 
 of climbers".
 
 Prototype: `.scratch/dot-tower/prototypes/15-composition/`.
+
+## Implemented in the model (session of 2026-09-07)
+
+This ticket specified the mechanism but measured the old one — it recommended
+one global replacement interval plus an authored ratio while every number in it
+came from three caps and three spawn intervals. `06-progression-curve/model.mjs`
+now runs the real thing, driven by ticket 14 needing entity counts that were not
+an artefact of a superseded design.
+
+**What changed.** `types[t].spawnInterval` is gone, replaced by `cfg.replacement`
+(one interval, whole stream) and `cfg.composition` (the authored ratio,
+defaulting to 4/3/2 to mirror the old 40/30/20 ceilings, so a mechanism change is
+not silently also a tuning change). The type replaced is whichever sits furthest
+below its authored share of the **live** stream — `CONTEXT.md` defines composition
+as the ratio *in the stream*, so this corrects for the differential mortality
+ticket 19 found rather than letting it drift the realised ratio. At the ceiling
+the slot is **skipped, never passed on**, exactly as this ticket settled. Setting
+the retired `spawnInterval` now throws rather than being silently ignored, so a
+stale prototype cannot look like it is still probing supply while changing nothing.
+
+**This ticket's prediction is confirmed on its own mechanism.** With the lock
+curve fixed (`lockCostBase` 2.5) the ceiling is skipped **zero** times, the crowd
+is 34 in run 1 and **9 at depth**, and the live mix settles on **exactly 4/3/2**.
+This ticket predicted "3/3/3 alive" and "9 at depth" from the old machinery; the
+new machinery reproduces it.
+
+**And it is conditional in a way worth recording.** Under the *default* lock
+curve the ceiling binds constantly — 2.9 to 4.2 skips per sample, crowd pinned at
+82–87. So under the curve as it stands today, **the cap is the crowd dial**,
+which is the one thing [ADR 0011](../../docs/adr/0011-composition-is-authored.md)
+says it must never be. That is not an argument against the ADR; it is an argument
+that [ticket 20](20-travel-time-and-the-lock-curve.md) is load-bearing for it.
+Full readings: [`prototypes/14-performance-budget/readings.txt`](../prototypes/14-performance-budget/readings.txt), section 4.
+
+Prior numbers in this ticket were measured on the old mechanism and are left as
+they stand; the resolution is unaffected, since composition was found inert under
+both lock curves and that is not what changed.

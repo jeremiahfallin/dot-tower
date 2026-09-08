@@ -374,3 +374,32 @@ is an upstream Bevy bug with a one-line fix and it deserves its own ticket.
 PowerVR. Ticket 04's "one borrowed Adreno phone" is still the cheapest way to
 settle whether tickets 02 and 10's UI foundation is in danger, and it is still
 unpurchased.
+
+### Parked, with the device line, until the desk work is done (session of 2026-09-08)
+
+Deliberately set aside, not dropped. Everything left on the map — tickets 17,
+18, 20, 21 — is desk work, so the effort is finishing it before any further
+device sessions. Parking is recorded here as a comment rather than by reopening
+the ticket, so the frontier scan does not pick this up as takeable.
+
+Un-parking is the next device session, and the batching the cold-build cost
+(8 minutes) demands is now part of the plan:
+
+- the **Godot control**, both renderers, `gl_compatibility` first —
+  godot#115171 makes Vulkan-Mobile a known crasher on this exact GPU;
+- the **minimal repro** (move 4, still unbuilt), now carrying the
+  per-vertex-fetch hypothesis the last session promoted to leading;
+- the **borrowed-Adreno test** — the one-minute reading that prices every
+  strategy question about Android, including whether the UI foundation in
+  tickets 02 and 10 is in danger at all;
+- [ticket 14](14-android-performance-budget.md)'s supply half, which is
+  logcat-visible and not blocked by the broken HUD.
+
+The alignment experiment's `[patch.crates-io]` stanza is reverted from the root
+`Cargo.toml` as part of parking: the hypothesis is eliminated, and every build
+on the branch should be stock `bevy_ui_render` 0.19.1 again. The vendored crate
+stays in place as evidence.
+
+The Pixel 11 launch abort found during the last session is now
+[ticket 24](24-pixel11-launch-abort.md), so it survives the parking
+independently of this ticket.

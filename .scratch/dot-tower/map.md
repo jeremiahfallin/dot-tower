@@ -25,6 +25,8 @@ This map is done when nothing is left to decide before someone sits down and bui
 - **No `Interaction`-based UI.** All UI input goes through `bevy_picking` observers. Bevy's legacy `ui_focus_system` aggregates touches globally rather than per finger (#11553), which breaks multi-touch — and the four hero ability buttons are a multi-touch surface.
 - **Vocabulary is fixed.** See `CONTEXT.md`. Retired synonyms: *seal*, *lockdown*, *level* (for floors), *summon*, *unit*.
 
+**Parked (2026-09-08).** The device-bound line — [ticket 22](issues/22-bevy-ui-android-rendering.md)'s remaining verdicts and [ticket 14](issues/14-android-performance-budget.md)'s supply half — is deliberately parked until the desk work finishes. Everything left on the map (17, 18, 20, 21) needs no hardware. Parking defers the proof, it does not redraw it: the destination still reads desktop *and* a physical Android device, and the question of whether that sentence changes comes to a head when the map is otherwise done — ideally priced by then by ticket 22's borrowed-Adreno reading, the cheapest test on the board. The Pixel 11 launch abort found on the way is [ticket 24](issues/24-pixel11-launch-abort.md), independent of the parking.
+
 **Settled at charting.** Premises established during the charting grill. These are not ticket resolutions — they are the ground the tickets stand on.
 
 - Spine: Thousand Floors' infinite generated floors, with a positional hero grafted on.

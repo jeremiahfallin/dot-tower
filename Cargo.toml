@@ -47,9 +47,3 @@ opt-level = 3
 [profile.release]
 lto = "thin"
 codegen-units = 1
-
-# --- TICKET 22 EXPERIMENT — remove with prototypes/22-ui-vertex-alignment/revert.sh
-# Points bevy_ui_render at a vendored 0.19.1 whose UI vertex layout is 16-byte
-# aligned. See .scratch/dot-tower/prototypes/22-ui-vertex-alignment/README.md.
-[patch.crates-io]
-bevy_ui_render = { path = ".scratch/dot-tower/prototypes/22-ui-vertex-alignment/bevy_ui_render" }

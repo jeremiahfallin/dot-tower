@@ -63,3 +63,17 @@ Two things for this ticket to carry:
 2. **The prestige ledger now has a third gain line** — earned multiplier, head start in floors, and
    relic currency. Ticket 08 judged line count safe because each has its own units, but this ticket
    owns whether the trigger stays legible with three things on it.
+
+## Comments
+
+### Premise settled by ticket 17 (2026-09-08)
+
+Ticket 17 decided *when* a run is over in value terms: the multiplier pays
+for new territory only ([ADR 0014](../../../docs/adr/0014-the-multiplier-pays-for-new-territory.md)),
+so a run is worth something from the moment it passes the account's
+best-ever floor and the optimal prestige lands shortly after — 1.5× faster
+than waiting for the stall. The measured facts this ticket's surface must
+carry: the **past-your-best moment** (concrete, spatial, on the tower), the
+×1.00 state before it (a ledger that says "this run has earned nothing yet"),
+and run lengths that lengthen with maturity (~40 min early, 2.5–3 h deep) so
+"the run is over" cannot lean on a fixed session length.

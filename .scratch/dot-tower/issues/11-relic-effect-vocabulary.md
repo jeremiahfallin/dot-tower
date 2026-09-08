@@ -170,3 +170,18 @@ baseline reach exists, the ranged-affinity relic gets its obvious legible form: 
 **The prestige-granted currency has no name.** *Vestige* and similar read as near-synonyms of
 *relic*, which is the kind of collision this glossary works to avoid, and *ascension* is already
 retired. Left to whoever writes the prestige screen copy; noted in the map's fog.
+
+## Comments
+
+### The spam-kill is now structural (ticket 17, 2026-09-08)
+
+This ticket priced the relic currency on *peak floor beyond your previous
+best* specifically to kill prestige-spam, carrying the burden alone. Ticket 17
+measured the exploit it feared (5-minute prestige cycles compound M to 4×10¹¹⁰
+in 12 h under the old earned-multiplier basis) and moved the kill to the
+multiplier itself: earned M now pays for new territory only
+([ADR 0014](../../../docs/adr/0014-the-multiplier-pays-for-new-territory.md)).
+The two rules are now one principle — *the account pays for new territory
+only* — so the currency rule no longer has to defend anything on its own, and
+a relic that interacts with prestige timing designs against the
+past-your-best moment rather than the stall.

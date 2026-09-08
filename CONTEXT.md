@@ -137,9 +137,11 @@ _Avoid_: Rebirth, ascension, reset
 **Prestige multiplier**:
 The single permanent scalar applied to climber and hero health and damage. The only source of
 permanent raw power. Two readings matter and must not be confused. The **earned** multiplier is
-what one prestige is worth on its own, a function of that run's peak floor; it stays small and is
-shown to the player. The **cumulative** multiplier is the running product of every earned
-multiplier so far; it grows without bound and is never displayed — see **Head start**.
+what one prestige is worth on its own, a function of how far that run's peak floor went
+**beyond the account's deepest-ever floor** — a run that never passes the account's best earns
+nothing; it stays small and is shown to the player. The **cumulative** multiplier is the running
+product of every earned multiplier so far; it grows without bound and is never displayed — see
+**Head start**.
 _Avoid_: Ascension bonus, legacy bonus
 
 **Head start**:

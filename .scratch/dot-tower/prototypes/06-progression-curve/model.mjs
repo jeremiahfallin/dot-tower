@@ -97,6 +97,10 @@ export const DEFAULTS = {
   prestigeDivisor: 50, prestigeExponent: 1.2, // M = (1 + peak/divisor)^exponent
   prestigeMode: 'compound', // 'bestPeak' = M is a function of best-ever peak (does not compound)
                             // 'compound' = each run's multiplier multiplies the last
+  prestigeBasis: 'peak',    // ticket 17: 'peak' pays for the run's peak floor (the shipped rule);
+                            // 'beyondBest' pays only for peak past the account's best-ever floor,
+                            // so re-conquered head start earns nothing -- the structural
+                            // prestige-spam kill (a fresh account sees identical numbers either way)
   stallMinutes: 6,           // peak flat this long => the run is over
   // Ticket 06 withdrew the sealed gold rate ("frozen floors emit nothing", per
   // CONTEXT.md's Lock) but the model kept paying it because it measured 0.0% under
@@ -625,7 +629,8 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
     seconds: t, gold, goldEarned, peak, deaths, deathsByType, kills, healToHero, healToClimbers, healByKind,
     heroUptime: heroTicks ? heroAliveTicks / heroTicks : 1, heroDeaths, killsInAura, killsTotal,
     lockLevel, lockLine: lockLine(), sealedRate, ranks: { ...ranks }, heroLevel,
-    prestigeMultEarned: prestigeMultFor(c, peak),
+    prestigeMultEarned: prestigeMultFor(c,
+      c.prestigeBasis === 'beyondBest' ? Math.max(0, peak - bestEverFloor) : peak),
     samples, events, pop: climbers.length,
   };
 }

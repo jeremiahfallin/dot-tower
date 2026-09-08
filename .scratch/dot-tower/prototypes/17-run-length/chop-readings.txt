@@ -1,0 +1,34 @@
+
+===== prestigeBasis: peak =====
+warm state: M = 4.05e+6, best-ever 841, head start 210 floors
+12h of play from there, per prestige policy:
+
+  policy            runs   wall    M_cum          ln M/h    frontier/h   head start
+  every 5 min      144   720m      4.194e+110   21.2264        0.0     3522
+  every 10 min      72   720m       4.153e+79   15.2773        0.0     2535
+  every 20 min      36   720m       4.805e+54   10.4924        0.0     1741
+  every 30 min      24   720m       2.116e+43    8.3134        4.9     1379
+  every 45 min      16   720m       1.024e+34    6.5260       42.1     1083
+  every 60 min      12   720m       2.606e+28    5.4525       79.2      905
+  every 90 min       8   720m       4.078e+21    4.1467      144.6      688
+  every 2 h          6   720m       3.923e+17    3.3759      127.2      560
+  every 3 h          4   720m       4.594e+13    2.6215       84.0      435
+  every 4 h          3   720m       6.143e+11    2.2620       63.0      375
+  at stall (today)   4   720m       4.580e+13    2.6213       82.1      435
+
+===== prestigeBasis: beyondBest =====
+warm state: M = 3.96e+2, best-ever 412, head start 83 floors
+12h of play from there, per prestige policy:
+
+  policy            runs   wall    M_cum          ln M/h    frontier/h   head start
+  every 5 min      144   720m        3.961e+2    0.4985        0.0       83
+  every 10 min      72   720m        3.961e+2    0.4985        0.0       83
+  every 20 min      36   720m        3.961e+2    0.4985        0.0       83
+  every 30 min      24   720m        3.961e+2    0.4985        0.0       83
+  every 45 min      16   720m        3.961e+2    0.4985        0.0       83
+  every 60 min      12   720m        5.816e+5    1.1061       33.8      184
+  every 90 min       8   720m        1.839e+5    1.0102       30.1      168
+  every 2 h          6   720m        6.522e+4    0.9238       25.8      153
+  every 3 h          4   720m        1.921e+4    0.8219       20.7      136
+  every 4 h          3   720m        9.615e+3    0.7643       17.8      127
+  at stall (today)   5   720m        1.881e+4    0.8202       20.7      136

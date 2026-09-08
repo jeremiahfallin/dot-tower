@@ -1,0 +1,46 @@
+
+===== warm campaign, 6 runs (beyondBest) =====
+  run  1:  40 min  peak  145  new  145  earned x5.12  M 5.12e+0  head start  23
+  run  2:  35 min  peak  203  new   58  earned x2.52  M 1.29e+1  head start  35
+  run  3:  45 min  peak  245  new   42  earned x2.08  M 2.68e+1  head start  45
+  run  4:  95 min  peak  300  new   55  earned x2.44  M 6.53e+1  head start  58
+  run  5: 121 min  peak  353  new   53  earned x2.38  M 1.55e+2  head start  70
+  run  6: 157 min  peak  412  new   59  earned x2.55  M 3.96e+2  head start  83
+
+interval sweep from M = 3.96e+2, best 412 (8h budget):
+  policy          runs   wall    M_cum          ln M/h    frontier/h
+  every  50 min    10   480m        5.957e+3    1.0865       16.5
+  every  60 min     8   480m        2.361e+4    1.2587       27.0
+  every  70 min     7   480m        2.462e+4    1.2639       28.0
+  every  80 min     6   480m        2.123e+4    1.2454       27.9
+  every  90 min     6   480m        1.318e+4    1.1858       24.9
+  every 120 min     4   480m        1.063e+4    1.1589       24.6
+  every 150 min     4   480m        5.925e+3    1.0859       21.0
+  every 180 min     3   480m        5.765e+3    1.0824       20.9
+  every 240 min     2   480m        3.467e+3    1.0189       18.4
+
+===== warm campaign, 12 runs (beyondBest) =====
+  run  1:  40 min  peak  145  new  145  earned x5.12  M 5.12e+0  head start  23
+  run  2:  35 min  peak  203  new   58  earned x2.52  M 1.29e+1  head start  35
+  run  3:  45 min  peak  245  new   42  earned x2.08  M 2.68e+1  head start  45
+  run  4:  95 min  peak  300  new   55  earned x2.44  M 6.53e+1  head start  58
+  run  5: 121 min  peak  353  new   53  earned x2.38  M 1.55e+2  head start  70
+  run  6: 157 min  peak  412  new   59  earned x2.55  M 3.96e+2  head start  83
+  run  7: 147 min  peak  466  new   54  earned x2.41  M 9.54e+2  head start  95
+  run  8: 150 min  peak  521  new   55  earned x2.44  M 2.32e+3  head start 107
+  run  9: 195 min  peak  591  new   70  earned x2.86  M 6.64e+3  head start 122
+  run 10: 202 min  peak  660  new   69  earned x2.83  M 1.88e+4  head start 136
+  run 11: 183 min  peak  723  new   63  earned x2.66  M 5.00e+4  head start 150
+  run 12: 136 min  peak  771  new   48  earned x2.24  M 1.12e+5  head start 161
+
+interval sweep from M = 1.12e+5, best 771 (8h budget):
+  policy          runs   wall    M_cum          ln M/h    frontier/h
+  every  50 min    10   480m        1.122e+5    1.4535        0.0
+  every  60 min     8   480m        1.122e+5    1.4535        0.0
+  every  70 min     7   480m        2.774e+6    1.8545       20.7
+  every  80 min     6   480m        5.066e+6    1.9297       26.5
+  every  90 min     6   480m        3.631e+6    1.8881       24.7
+  every 120 min     4   480m        3.504e+6    1.8837       26.2
+  every 150 min     4   480m        1.938e+6    1.8096       22.6
+  every 180 min     3   480m        1.874e+6    1.8055       22.5
+  every 240 min     2   480m        1.111e+6    1.7401       20.0

@@ -47,11 +47,19 @@ that are not 16-byte aligned, and does it silently.
 
 ## Why it fits every observation ticket 04 recorded
 
-- **Silent.** Core Vulkan permits 4-byte attribute offsets, so the validation
-  layers have nothing to report. A conformant-looking-but-wrong fetch trips no
-  error, no wgpu log, no naga warning. The silence is the tell.
-- **Sprite layer correct, UI layer corrupt, same frame.** The only structural
-  difference between them is the one above.
+- ~~**Silent.**~~ **Withdrawn by ticket 23.** The layout *is* legal — core
+  Vulkan requires only component-size alignment
+  (`VUID-vkCmdDraw-format-10390`), and `wgpu-core` encodes exactly that
+  (`attribute.format.size().min(4)`). But the silence is not evidence for this
+  hypothesis over any other: wgpu loads `VK_LAYER_KHRONOS_validation` only if
+  present and logs its absence below Bevy's filter, stock retail Android does
+  not ship it, and the modern alignment VUs are unimplemented anyway. Most
+  likely there was **no validation layer**. What survives is the sharper point:
+  the layout being legal means this hypothesis requires a plain **driver
+  conformance failure**.
+- **Sprite layer correct, UI layer corrupt, same frame.** Alignment is *a*
+  structural difference between them — not the only one. See "What the contrast
+  does not settle" below.
 - **Buttons render as nothing at all, rather than as garbage.** With `radius`
   and `border` garbage, `sd_inset_rounded_box` returns garbage, and both
   `draw_uinode_background` and `draw_uinode_border` end in

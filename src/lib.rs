@@ -18,6 +18,10 @@ use bevy::{
     input::touch::Touches,
     log::{Level, LogPlugin},
     prelude::*,
+    render::{
+        settings::{RenderCreation, WgpuSettings},
+        RenderPlugin,
+    },
     render::view::Msaa,
     text::{FontSize, FontSmoothing},
     ui_render::UiAntiAlias,
@@ -35,6 +39,46 @@ pub fn main() {
 
     app.add_plugins(
         DefaultPlugins
+            // PIXEL 11 WORKAROUND. On Tensor G6 the PowerVR driver's SPIR-V
+            // compiler aborts inside `IMG_vkCreateComputePipelines` while
+            // mangling an image type, killing the process on launch before
+            // anything renders. Bevy already downgrades the Pixel 10 away from
+            // the compute-driven culling path, but it does so with an exact
+            // name match on "PowerVR D-Series DXT-48-1536 MC1"
+            // (`bevy_render::get_pixel10_driver_version`), and this device
+            // reports "PowerVR C-Series CXTP-48-1536 MC1", so the workaround
+            // never fires and Bevy selects `GpuPreprocessingMode::Culling`.
+            //
+            // Zeroing this limit is the documented canary Bevy itself checks
+            // first, so it forces `GpuPreprocessingMode::None` without touching
+            // the vendored crate. Remove once upstream broadens that match.
+            .set(RenderPlugin {
+                render_creation: RenderCreation::Automatic(Box::new(WgpuSettings {
+                    // `limits` is only a *request* — Bevy resolves it against
+                    // what the adapter reports and a constraint is lost.
+                    // `constrained_limits` is applied afterwards via
+                    // `or_worse_values_from`, so it wins regardless of adapter
+                    // support (bevy_render/src/renderer/mod.rs:321).
+                    //
+                    // Zeroing `max_compute_workgroup_size_x` was the first
+                    // attempt and is too blunt: it forces `Culling` off, but it
+                    // also invalidates Bevy's own "sparse buffer update"
+                    // pipeline, whose entry point declares a workgroup size of
+                    // 256, and Bevy quits on the validation error.
+                    //
+                    // Constraining storage *textures* instead trips Bevy's
+                    // `limit_support` check (it wants >= 12) and lands on
+                    // `GpuPreprocessingMode::PreprocessingOnly` — exactly the
+                    // mode the Pixel 10 is demoted to, and a configuration
+                    // known to run. This harness uses no storage textures.
+                    constrained_limits: Some(bevy::render::settings::WgpuLimits {
+                        max_storage_textures_per_shader_stage: 4,
+                        ..default()
+                    }),
+                    ..default()
+                })),
+                ..default()
+            })
             .set(LogPlugin {
                 // On Android these are routed to the native logger, so they
                 // surface under `adb logcat -s dot-tower RustStdoutStderr`.

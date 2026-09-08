@@ -58,17 +58,37 @@ Two failed approaches are recorded because both are instructive:
   invalidates Bevy's own sparse-buffer-update pipeline, whose entry point
   declares a workgroup size of 256, and Bevy quits on the validation error.
 
+## Reported upstream (2026-09-08)
+
+Steps 1 and 2 below are **done**. This ticket was written without visibility
+into the session that did them; recording the outcome here.
+
+**Sameness confirmed.** bevy#23754's thread carries the same signature —
+`SIGABRT` on the `Async Compute T` thread, PowerVR, traced by its reporters to
+shader compilation. Two contributors were actively bisecting it and a
+maintainer was engaged, so the finding belonged on that thread rather than in a
+new issue, which is where it went.
+
+**Comment posted:**
+[bevy#23754 (comment)](https://github.com/bevyengine/bevy/issues/23754#issuecomment-5586670782).
+It carries the symbolised driver frames (the thread had the crash but not the
+resolved backtrace), the root cause, the two-row table showing both handsets on
+0.19.1 diverging on the GPU-preprocessing log line, the `constrained_limits`
+workaround with both failed attempts, and the suggested fix — match the vendor
+id `0x1010` or a name prefix rather than one literal product string, since as
+written every future PowerVR part regresses to a launch crash the day it ships.
+
+Deliberately scoped: it does **not** claim to close the Pixel 10 case (a
+reporter there still hit it on driver `25.1`, and this project no longer has a
+Pixel 10 to test a fix against), and it keeps the `bevy_ui` corruption out of
+the thread — one paragraph flags it as a separate fault, since two bugs in one
+thread helps nobody. An offer to test patches on the Pixel 11 is on the record.
+
 ## What remains
 
-1. **Confirm bevy#23754 sameness** — read the thread against the backtrace
-   above; if it is the same fault, the fix belongs there rather than in a new
-   issue.
-2. **Report upstream**, with the one-line fix: match the PowerVR family (both
-   D-Series and C-Series strings, or a prefix match on `"PowerVR"` combined with
-   whatever else the demotion actually keys on) rather than one exact device
-   string. **This is an outward-facing act — publishing to the Bevy tracker —
-   and waits for an explicit go-ahead.** Desk work otherwise.
-3. **Track the fix**, and when a Bevy release carries it, delete the
-   workaround from `src/lib.rs` and re-verify launch on the handset.
+1. **Track the fix.** When a Bevy release carries a broadened match, delete the
+   workaround from `src/lib.rs` and re-verify launch on the handset. Testing a
+   maintainer's patch before then was offered and needs the device.
 
-Not blocked by the parking of tickets 22 and 14: steps 1 and 2 need no device.
+Nothing here is blocked by the parking of tickets 22 and 14, but the
+re-verification does need the phone, so it batches with that session.

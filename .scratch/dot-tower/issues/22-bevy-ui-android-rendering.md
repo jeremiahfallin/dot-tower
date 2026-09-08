@@ -305,3 +305,72 @@ and the two do not overlap.
 `Cargo.lock` moved with it; the prototype directory is untracked. Nothing here
 should reach `main` as-is — branch it, or run `revert.sh` before committing
 anything else.
+
+### Tested on hardware: the alignment hypothesis is wrong (session of 2026-09-08)
+
+**The patch does not fix it.** Verified on device, with the vendored crate
+confirmed compiled into the APK. The alignment hypothesis is **eliminated**, and
+that is this prototype working exactly as designed — it was built with a
+clean-negative property precisely so a null result would mean something.
+
+The device was **not** the bringup handset. It is a **Pixel 11 Pro, Tensor G6,
+PowerVR C-Series CXTP-48-1536 MC1, driver `25.3@6908880`**, Android 17 / API 37 —
+a different SoC generation, a different GPU series and a different driver branch
+from ticket 04's Pixel 10 / Tensor G5 / D-Series DXT.
+
+Evidence in [`prototypes/22-ui-vertex-alignment/evidence-pixel11/`](../prototypes/22-ui-vertex-alignment/evidence-pixel11/).
+
+#### 1. The bug reproduces across two PowerVR generations
+
+Stock `bevy_ui` on this handset shows **ticket 04's signature exactly**: sprite
+layer pixel-perfect, UI layer scattered glyph fragments, no buttons, no
+safe-area frame, frames differing three seconds apart. Two SoC generations, two
+GPU series, two driver branches.
+
+**This is no longer plausibly a driver regression.** It is a standing PowerVR
+family failure, and every Pixel from the 10 onward is affected. That raises the
+stakes on ticket 22 and it removes "wait for a driver update" as a strategy.
+
+#### 2. The alignment patch changes nothing that matters
+
+Patched build: still corrupt, same character. One frame showed partial grey
+button geometry at the bottom right that stock never produced — but the next
+frame did not, so it is transient corruption, not a partial fix. **Do not read
+it as progress.**
+
+Ticket 23 had already withdrawn the "silence" argument and shown the
+sprite/UI contrast under-determines alignment. This closes it out: the layout
+was legal, the patch made it *more* legal, and the corruption is indifferent.
+
+#### 3. What is now the leading hypothesis
+
+The prototype README's fallback list, unchanged and now promoted:
+
+1. **Per-vertex attribute fetch itself.** `bevy_sprite_render` is
+   `VertexStepMode::Instance` and builds positions from
+   `@builtin(vertex_index)` — it **never fetches a per-vertex attribute at
+   all**. A driver bug confined to `VertexStepMode::Vertex` produces exactly
+   this sprite/UI split and the alignment patch would not touch it. This is now
+   the best remaining explanation and it is **directly testable**: draw one
+   quad two ways in a minimal repro.
+2. **Varying count or `@interpolate(flat)` at width.** UI passes 7 locations,
+   4 of them flat; sprite passes 2, 1 flat.
+
+Both separate cheaply with the minimal repro — move 4 on this ticket, still
+unbuilt, and now the obvious next thing to build.
+
+#### 4. A bigger finding, which is not this ticket's
+
+Stock Bevy 0.19.1 **does not run at all** on the Pixel 11 — it aborts on launch
+inside the PowerVR SPIR-V compiler at `IMG_vkCreateComputePipelines`, because
+`bevy_render` identifies the Pixel 10 for its GPU-preprocessing demotion with an
+exact string match on `"PowerVR D-Series DXT-48-1536 MC1"`. Details, the failed
+workarounds and the working one are on branch `wayfinder/pixel11-bringup`. That
+is an upstream Bevy bug with a one-line fix and it deserves its own ticket.
+
+#### 5. Still not established
+
+**Whether any non-PowerVR device is affected.** Every reading to date is
+PowerVR. Ticket 04's "one borrowed Adreno phone" is still the cheapest way to
+settle whether tickets 02 and 10's UI foundation is in danger, and it is still
+unpurchased.

@@ -38,7 +38,7 @@ An expendable, anonymous unit that spawns at the lock line and fights its way up
 _Avoid_: Unit, summon, minion, hero
 
 **Climber type**:
-A named behavioural archetype shared by many climbers — melee, ranged, or healer. Type is where identity, rank, and relic affinity attach.
+A named behavioural archetype shared by many climbers — melee, ranged, or healer. Type is where identity, rank, and relic affinity attach. Each type reads at a glance by **silhouette and a colour-blind-safe hue together** — never colour alone — and the healer alone carries a small tag above its head, so it is distinguishable from furthest away. A climber's state never renders; deaths read in aggregate at the wall.
 _Avoid_: Class, role, job
 
 **Rank**:

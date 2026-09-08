@@ -118,3 +118,11 @@ Grilled 2026-09-08 — all five questions settled as recommended. Decision recor
 One closure with teeth: the tower column's visual vocabulary is now **closed** — lock line,
 wall hatch, aura, record. Ticket 21's type legibility must work within these four; nothing
 further is added to the column.
+
+### The closure held (2026-09-08)
+
+Ticket 21 spent the fixed budget this ticket handed it: the healer-only tag is
+**sprite anatomy, not column furniture**, so the four-mark vocabulary closed
+here — lock line, wall hatch, aura, record — holds unamended. Type reads on
+the climbers themselves as shape + hue
+([ADR 0016](../../../docs/adr/0016-type-reads-as-shape-hue-and-one-tag.md)).

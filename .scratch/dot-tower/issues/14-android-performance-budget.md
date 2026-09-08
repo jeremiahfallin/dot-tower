@@ -172,3 +172,14 @@ under the **default** lock curve. Ticket 20 owns that curve, and if it lands a
 fix the crowd numbers move — the fixed-curve probe above already showed 88 → 9
 climbers at depth. Re-check the entity range against whatever curve ships
 before testing.
+
+### Entity range settled by ticket 20 (2026-09-08)
+
+The caution above resolved: the curve that ships is time-priced locks
+([ADR 0013](../../../docs/adr/0013-locks-are-priced-in-time.md)), and the
+10-run design campaign measures **entities max 157, mean 42** (the shipped
+geometric curve: max 213, mean 137). So the device session should frame-time
+**~40–160 entities**, not 200–450 — the demand half's range came from the
+broken curve's string-out. Peak-entity moments are early-run (fresh account,
+~57 climbers plus packs) and deep-run frontier surges; the sustained case is
+the mean, ~40.

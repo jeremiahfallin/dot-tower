@@ -1,0 +1,16 @@
+
+### lockTimeCost = 15s   [M5 = 1.63e+5, warm run-5 peak 622]
+  run 1           129  walk    7.1  spread    5.8  pop  17 (8/6/4)  life  29s  skips 0.00  locks  11 @  15s  gold: rank 69% hero 22% lock   3% pool 6%  ent 86
+  run 6           789  walk   10.9  spread    2.0  pop  13 (6/4/3)  life  22s  skips 0.00  locks  77 @  20s  gold: rank 71% hero 23% lock   5% pool 1%  ent 48
+
+### lockTimeCost = 30s   [M5 = 1.48e+5, warm run-5 peak 614]
+  run 1           145  walk   24.7  spread   23.4  pop  57 (26/19/13)  life  96s  skips 1.35  locks  13 @  35s  gold: rank 59% hero 20% lock  17% pool 4%  ent 140
+  run 6           776  walk   12.5  spread    2.6  pop  15 (7/5/3)  life  25s  skips 0.00  locks  76 @  20s  gold: rank 66% hero 23% lock   7% pool 4%  ent 50
+
+### lockTimeCost = 60s   [M5 = 1.61e+5, warm run-5 peak 613]
+  run 1           134  walk  101.8  spread   93.9  pop  86 (38/29/19)  life 144s  skips 3.69  locks   3 @ 448s  gold: rank 64% hero 26% lock  10% pool 0%  ent 167
+  run 6           773  walk   42.1  spread   32.7  pop  45 (20/15/10)  life  75s  skips 0.52  locks  73 @  20s  gold: rank 66% hero 25% lock   4% pool 4%  ent 149
+
+### lockTimeCost = 120s   [M5 = 1.83e+5, warm run-5 peak 617]
+  run 1           133  walk  114.8  spread  107.1  pop  86 (38/29/19)  life 144s  skips 3.65  locks   0 @ NaNs  gold: rank 70% hero 29% lock   0% pool 1%  ent 169
+  run 6           776  walk   59.5  spread   56.3  pop  63 (28/21/14)  life 105s  skips 1.10  locks  72 @  20s  gold: rank 69% hero 26% lock   3% pool 2%  ent 153

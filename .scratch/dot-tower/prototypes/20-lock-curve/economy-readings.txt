@@ -1,0 +1,18 @@
+
+### lockCostBase 2.478 (matched)
+  run 1:
+  peak   139  ranks 55/53/53 hero  49  locks  12  | gold -> rank  69.6% hero  23.9% lock   3.7% POOL   2.9%  (identity residual 3.0e-5)
+  run 6:
+  peak  1212  ranks 456/455/454 hero 450  locks 119  | gold -> rank  74.7% hero  23.7% lock   0.0% POOL   1.6%  (identity residual 4.2e+41)
+
+### lockCostBase 2.7
+  run 1:
+  peak   151  ranks 57/56/55 hero  51  locks  12  | gold -> rank  69.5% hero  22.0% lock   4.9% POOL   3.7%  (identity residual -1.4e-4)
+  run 6:
+  peak  1197  ranks 450/448/448 hero 444  locks 116  | gold -> rank  66.5% hero  22.9% lock   6.1% POOL   4.5%  (identity residual -1.9e+40)
+
+### lockCostBase 4
+  run 1:
+  peak   147  ranks 56/54/54 hero  50  locks   9  | gold -> rank  66.9% hero  23.0% lock   6.6% POOL   3.6%  (identity residual -5.1e-5)
+  run 6:
+  peak   750  ranks 261/259/259 hero 255  locks  47  | gold -> rank  71.9% hero  24.7% lock   2.3% POOL   1.0%  (identity residual 9.1e+18)

@@ -17,7 +17,10 @@ _Avoid_: Dungeon, run map
 **Lock**:
 A permanent-within-a-run gold purchase applied every 10 floors that raises the spawn point, so
 every climber's walk to the front starts higher. It is a spawn-point and travel-time mechanic:
-the floors beneath a lock are sealed and produce **no** income.
+the floors beneath a lock are sealed and produce **no** income. The price is set in **time** —
+a fixed number of seconds of recent income, so it tracks the economy by construction — and a
+lock below the **account**'s deepest-ever floor is free, because head start is conquered
+territory.
 _Avoid_: Seal, lockdown, gate
 
 **Lock line**:

@@ -42,3 +42,19 @@ Resolve:
 
 Prototype rather than grilling: this is "what should it look like", so it wants variations to
 react to. Blocked on ticket 15 only for its premise, which is now settled — takeable immediately.
+
+## Comments
+
+### Premise re-numbered by ticket 20 (2026-09-08)
+
+The constraint bullet "42 early, 9 at depth (ticket 15)" is stale twice over:
+ticket 15's fixed-curve readings rode the unimplemented sealed-income
+withdrawal (ticket 20 excavated it), and the curve that ships is time-priced
+locks ([ADR 0013](../../../docs/adr/0013-locks-are-priced-in-time.md)), which
+re-numbers the crowd. Current design numbers, replacement 1.67s: **~57 in a
+fresh account (26/19/13), 15 at run 6 (7/5/3), 53 at run 11 (24/18/12)**, over
+a walk bounded to 12–25 floors — inside ticket 10's 12–14-floor column window,
+so the sprites live in that band. At depth this remains a legibility problem
+about a few sprites; early-game it is ~4× the crowd the premise assumed, and
+Q3's smallest-sprite question now has a concrete band to fit rather than a
+vague "a handful".

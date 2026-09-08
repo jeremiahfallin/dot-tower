@@ -1,0 +1,9 @@
+run 6, K=30s, M=3.4e+5
+  goldEarned      1.256e+54
+  of which sealed 1.247e+54  (99.3%)
+  of which kills  8.637e+51
+  lock events     119, total spend 3.677e+49 (0.00% of earned)
+    t=  882s floor    10 cost 1.37e+17  (rate then: 4.57e+15/s)
+    t= 1468s floor   600 cost 2.38e+26  (rate then: 7.92e+24/s)
+    t= 3545s floor  1190 cost 2.02e+49  (rate then: 6.72e+47/s)
+  mean kill rate  2.40e+48/s;  final sealedRate 6.23e+45/s (xM=3.4e+5)

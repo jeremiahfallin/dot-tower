@@ -130,8 +130,8 @@ situation. **Take it over freely — there is no continuity to preserve.**
 #### The finding
 
 `bevy_ui` and `bevy_sprite` draw into the same frame, on the same device, with
-the same driver. One is correct and one is corrupt. **Their vertex layouts
-differ in exactly one structural way, and it is alignment.**
+the same driver. One is correct and one is corrupt. **Their vertex layouts differ
+in alignment** — see the caveat below, which ticket 23 was right to press on.
 
 `bevy_sprite_render` hand-writes its layout: five `Float32x4` at bytes 0, 16,
 32, 48, 64, stride 80. Every attribute 16-byte aligned, and the stride is a
@@ -158,9 +158,13 @@ not 16-byte aligned, silently.**
 It fits every observation ticket 04 recorded, including the two that were
 hardest to explain:
 
-- **The silence.** Core Vulkan permits 4-byte attribute offsets, so the
-  validation layers have nothing to say. A wrong-but-legal fetch trips no error,
-  no wgpu log, no naga warning.
+- ~~**The silence.**~~ **Withdrawn by [ticket 23](23-upstream-bevy-ui-android.md).**
+  This was listed here as evidence and is not. wgpu loads
+  `VK_LAYER_KHRONOS_validation` only if it finds it and logs its absence at
+  `log::debug!`, below Bevy's filter; stock retail Android does not ship that
+  layer; and the modern attribute-alignment VUs (`-10389`, `-10390`) are
+  unimplemented in the validation layers anyway. "No validation failure" most
+  likely means **"no validation layer."** It discriminates nothing.
 - **Buttons rendering as *nothing*, not as garbage.** With `radius` and `border`
   garbage, `sd_inset_rounded_box` returns garbage and both `draw_uinode_*`
   functions end in `saturate(color.a * t)`. A `t` of zero is a fully transparent
@@ -193,6 +197,60 @@ a stride that is not a multiple of 16 — the exact shape here. Only the device
 decides this; reading has taken it as far as it goes.
 [bevy#7944 "Corruption on some UI elements"](https://github.com/bevyengine/bevy/issues/7944)
 is the closest title in the tracker and was not chased.
+
+#### Corrected by ticket 23, which read the upstream sources
+
+[Ticket 23](23-upstream-bevy-ui-android.md) is resolved and moved two of the
+arguments above in opposite directions. Net: roughly even, and the hypothesis
+still stands.
+
+- **"The silence is the tell" is withdrawn**, struck above.
+- **"Differ in exactly one structural way" was overstated.** They differ in two:
+  `bevy_sprite_render` is `VertexStepMode::Instance` and builds positions from
+  `@builtin(vertex_index)`, so it **fetches no per-vertex attribute at all**.
+  Any bug confined to vertex-rate fetch produces the same sprite/UI split, and
+  this patch would not touch it. The prototype README already listed that as the
+  first fallback hypothesis; this comment claimed more than the evidence allows.
+- **Gained, and worth more than what was lost: prior art for the class, on the
+  exact silicon.** This comment recorded that none existed.
+  [godot#121005](https://github.com/godotengine/godot/issues/121005) (open,
+  2026-07-06) is Pixel 10 Pro XL, "PowerVR D-Series DXT-48-1536, OpenGL ES 3.2
+  build **25.1@6794074**": a legal but unusual vertex-attribute configuration is
+  **silently mis-fetched**, attributes "reading garbage", the **draw disappears
+  entirely**, "no GL errors, no warnings", other draws in the same frame fine,
+  not reproducible on desktop. Every structural row matches probe F. It
+  corroborates the *class*, not the alignment mechanism, and it is the GLES
+  driver rather than the Vulkan one.
+- **Sharpened: the layout is legal, so this needs a plain driver conformance
+  failure.** `VkVertexInputAttributeDescription` has four valid-usage statements
+  and none constrains offset alignment; the rule is
+  `VUID-vkCmdDraw-format-10390`, requiring only component-size alignment.
+  `wgpu-core` encodes exactly that — `attribute.format.size().min(4)`. That is a
+  higher bar than "Bevy is doing something dubious", and worth stating plainly.
+- **Adjacent:** Imagination's own PowerVR Graphics Recommendations say "on some
+  devices, padding each vertex to **16-byte boundaries** may also improve
+  performance" — about *stride*, doubly hedged, filed under performance. It
+  supports the 88 → 96 stride change as something Imagination think about; it
+  supports no correctness claim about attribute offsets.
+
+**And #14710 is definitively not this bug.** wgpu#8853 was a missing pipeline
+barrier between two render passes writing the same colour attachment. Every
+device in its thread is Mali or MediaTek/Exynos, the symptom is uniformly
+flicker, and it was **never closed**. A barrier bug decides whether the UI pass
+*lands*; it cannot scramble geometry within the pass.
+
+#### Two things to do differently on device, from ticket 23
+
+1. **Run the Godot control on `gl_compatibility` first.**
+   [godot#115171](https://github.com/godotengine/godot/issues/115171) (open) is
+   an Android/Vulkan-Mobile crash on **Pixel 10 Pro, ImgTech DXT-48-1536**, with
+   a backtrace through `vulkan.powervr.so (IMG_vkCreatePipelineCache+828)`, from
+   Play analytics on a shipping game. The probe's `project.godot` sets
+   `rendering_method.mobile="mobile"` — that exact path. `run.sh --renderer
+   gl_compatibility` already exists. Run both ways.
+2. **Bundle the validation layer, or raise the log filter to `debug`, before any
+   further argument rests on silence.** The harness has no diagnostic channel at
+   all right now, which is a worse position than "the bug is silent" implies.
 
 #### What is built
 

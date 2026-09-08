@@ -10,7 +10,8 @@ No device was attached in the session that built this.
 
 `bevy_ui` and `bevy_sprite` draw into the same frame, on the same device, with
 the same driver. One is correct and one is corrupt. Their vertex layouts differ
-in exactly one structural way.
+in alignment — though **not only** in alignment; see "What the contrast does not
+settle" below.
 
 **Sprite — renders correctly.** Hand-written layout, `bevy_sprite_render/src/render/mod.rs:216`:
 
@@ -76,33 +77,52 @@ wgpu 29 fix is real but irrelevant here. That is a finding for
 [ticket 23](../../issues/23-upstream-bevy-ui-android.md), not a conclusion of
 this prototype.
 
-## Prior art: none found
+## Prior art: one strong class-level case, on this exact silicon
 
-Searched before building, so the next person does not repeat it. **No report
-matching this signature exists that I could find**, which is a reason to hold
-the hypothesis loosely — it rests on the source-level difference above, not on
-anyone else having hit it.
+Ticket 23 searched the upstream sources properly and changed this section. What
+follows supersedes the "none found" this file originally recorded.
 
-- No Bevy, wgpu or Imagination issue describes `bevy_ui` corruption on PowerVR
-  or Tensor hardware, and none describes a vec4 vertex-attribute alignment bug
-  on PowerVR specifically.
-- [bevy#7944 "Corruption on some UI elements"](https://github.com/bevyengine/bevy/issues/7944)
-  is the closest title in the tracker and is worth a read by whoever picks this
-  up; it was not chased here.
-- Weak, general corroboration only: PowerVR is reported as a poorly-supported
-  Vulkan target for native games, with corruption expected on some hardware —
-  e.g. [supertuxkart#5388](https://github.com/supertuxkart/stk-code/issues/5388),
-  [Mesa's PowerVR driver docs](https://docs.mesa3d.org/drivers/powervr.html).
-  Consistent with the Tensor G5 being the first Google SoC on Imagination
-  D-Series, and with ticket 23's suspicion that the Rust graphics stack has
-  little exposure to it.
+**[godot#121005](https://github.com/godotengine/godot/issues/121005)** (open,
+2026-07-06) — Pixel 10 Pro XL, **"PowerVR D-Series DXT-48-1536, OpenGL ES 3.2
+build 25.1@6794074"**. A `MultiMeshInstance2D` draw is **invisible** whenever the
+instance count exceeds 256 and is not a power of two. A legal but unusual vertex
+attribute configuration (a large non-power-of-two `glVertexAttribDivisor`) is
+**silently mis-fetched**, leaving attributes "reading garbage"; **"no GL errors,
+no warnings"**; non-instanced canvas items in the same frame render normally; not
+reproducible on desktop. **Every structural row matches probe F.**
 
-The counter-argument deserves stating: 4-byte-aligned vertex attributes are
-extremely common, so a driver that mis-fetches them would break a great deal of
-software, and someone would likely have noticed. What is less common is a
-`Float32x4` at a 4-byte-aligned offset with a stride that is not a multiple of
-16 — which is the exact shape here. That is why the on-device test decides this
-and reading does not.
+It corroborates the **class** — this driver silently mis-fetches vertex
+attributes under legal-but-unusual configurations — not the alignment mechanism
+specifically, and it is the GLES driver rather than the Vulkan one.
+
+Still true, and still worth knowing:
+
+- **No report matching probe F's signature exists.** Nothing in the Bevy, wgpu,
+  naga or Khronos trackers describes sprite-correct/UI-corrupt on PowerVR,
+  Imagination or Tensor hardware. **"Tensor G5" returns zero hits in both the
+  Bevy and wgpu trackers.**
+- **wgpu carries zero PowerVR correctness workarounds** — a vendor-id constant,
+  a GLES vendor-string match and one limits exception, against named workarounds
+  for Qualcomm, NVIDIA, Intel and MoltenVK. `wgpu#7669` (PowerVR crash,
+  `external: driver-bug`) has been open with zero comments since 2025-05-05.
+  The thin layer is upstream of Bevy.
+- [bevy#7944](https://github.com/bevyengine/bevy/issues/7944) is a **different
+  bug**: AMD RDNA2 desktop, Vulkan-only, fixed by DX12, root-caused to an MSAA
+  sample-count mismatch. Now read; nothing to do with Android.
+- **Imagination's own guidance** says "on some devices, padding each vertex to
+  **16-byte boundaries** may also improve performance" — about *stride*, doubly
+  hedged, under performance. It supports the 88 → 96 stride change as something
+  they think about; it supports no correctness claim about attribute offsets.
+
+## What the contrast does not settle
+
+**The sprite/UI contrast under-determines alignment**, and this file should have
+said so where it stated the difference. The two paths differ in *two* ways, not
+one: `bevy_sprite_render` is also `VertexStepMode::Instance` and builds positions
+from `@builtin(vertex_index)`, so it **fetches no per-vertex attribute at all**.
+Any driver bug confined to vertex-rate fetch produces exactly the same split, and
+this patch would not touch it. That is fallback hypothesis 1 below, and it is the
+reason the clean-negative property matters more than the argument does.
 
 ## The patch
 
@@ -145,6 +165,21 @@ attached, and `screencapture` on the dev machine lacks Screen Recording
 permission (it returns wallpaper with the menu bar and no windows), so even the
 macOS control could not be photographed. The desktop control is 15 seconds of
 someone's time and should be done first — see below.
+
+## Before spending device time — two warnings from ticket 23
+
+1. **Run the Godot control on `gl_compatibility` first, not the default.**
+   [godot#115171](https://github.com/godotengine/godot/issues/115171) (open) is
+   an Android/Vulkan-Mobile crash on **Pixel 10 Pro, ImgTech DXT-48-1536**, with
+   a backtrace through `vulkan.powervr.so (IMG_vkCreatePipelineCache+828)`, from
+   Play analytics on a shipping game. The probe's `project.godot` sets
+   `rendering_method.mobile="mobile"` — that exact path, so it may well crash
+   before it renders anything. `run.sh --renderer gl_compatibility` already
+   exists. Run both ways and record which one got further.
+2. **Bundle `VK_LAYER_KHRONOS_validation` into the APK, or at minimum raise the
+   log filter to `debug`.** The harness currently has no diagnostic channel at
+   all — worse than "the bug is silent" implies — and nothing further should
+   rest on silence until it does.
 
 ## Running it
 

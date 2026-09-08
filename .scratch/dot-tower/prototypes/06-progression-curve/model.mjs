@@ -14,9 +14,9 @@ export const DEFAULTS = {
   rankCostBase: 1.30,        // steeper than power, by design
   healScalesWithPrestige: false, // prestige multiplies HEALTH and DAMAGE only
   types: {
-    melee:  { hp0: 70, dps0: 5.5, heal0: 0,   cap: 40, rankCost0: 25, spawnInterval: 5.0, threat: 3.0 },
-    ranged: { hp0: 30, dps0: 9.0, heal0: 0,   cap: 30, rankCost0: 35, spawnInterval: 5.0, threat: 1.0 },
-    healer: { hp0: 36, dps0: 0,   heal0: 3.5, cap: 20, rankCost0: 45, spawnInterval: 5.0, threat: 0.5 },
+    melee:  { hp0: 70, dps0: 5.5, heal0: 0,   cap: 40, rankCost0: 25, threat: 3.0 },
+    ranged: { hp0: 30, dps0: 9.0, heal0: 0,   cap: 30, rankCost0: 35, threat: 1.0 },
+    healer: { hp0: 36, dps0: 0,   heal0: 3.5, cap: 20, rankCost0: 45, threat: 0.5 },
   },
   climbSpeed: 0.5,           // floors/s across a cleared floor
 
@@ -55,6 +55,24 @@ export const DEFAULTS = {
   heroTaunt: false,          // hero is the primary target on its floor while it lives
   heroRegenPct: 0,           // fraction of max HP regenerated per second
 
+  // --- the stream (ticket 15, ADR 0011) ---
+  // ONE interval for the whole stream, applied against an authored ratio. This
+  // replaces three per-type `spawnInterval`s: six numbers were quietly steering
+  // three unrelated things -- the ratio, ticket 06's run-length dial and ticket
+  // 19's survival dial. `replacement` is the run-length dial and nothing else.
+  //
+  // 1.67s reproduces the old aggregate inflow (three types x one per 5s), so a
+  // mechanism change is not silently also a tuning change.
+  replacement: 1.67,
+  // The authored ratio. NOT tuned to an optimum and never shown to the player
+  // (ADR 0011). 4/3/2 mirrors the old 40/30/20 ceilings so this change is about
+  // mechanism only; ticket 15 notes near-equal reads better as an army, and the
+  // integers themselves wait on ticket 20.
+  composition: { melee: 4, ranged: 3, healer: 2 },
+  // Caps survive as a per-type CEILING, never a lever and never bought (ADR 0011).
+  // Under a healthy lock curve they should not bind at all -- and `capBoundFrac`
+  // in each sample reports whether that is actually true.
+
   // --- locking ---
   lockCost0: 500, lockCostBase: 4.0,
   lockMargin: 15,            // only lock 10k when peak floor is this far above it
@@ -64,6 +82,13 @@ export const DEFAULTS = {
   prestigeMode: 'compound', // 'bestPeak' = M is a function of best-ever peak (does not compound)
                             // 'compound' = each run's multiplier multiplies the last
   stallMinutes: 6,           // peak flat this long => the run is over
+
+  // --- entity accounting (ticket 14) ---
+  // Ticket 03: a floor is inert DATA until a climber comes "within a floor or
+  // two", at which point its pack spawns as entities and despawns behind them.
+  // This is that radius, made explicit so the bound can be measured rather than
+  // asserted. It affects instrumentation only -- no simulation behaviour reads it.
+  activationRadius: 2,
 };
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -101,6 +126,18 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
   const c = cfg;
   const M = prestigeMult;
 
+  // Ticket 15 retired per-type spawn intervals. Silently ignoring one would let
+  // a stale prototype look like it was still probing supply while changing
+  // nothing, so refuse instead.
+  for (const ty of ['melee', 'ranged', 'healer']) {
+    if (c.types[ty].spawnInterval !== undefined) {
+      throw new Error(
+        `types.${ty}.spawnInterval was retired by ticket 15 (ADR 0011): the stream has ` +
+        `ONE global interval. Set cfg.replacement instead, and cfg.composition for the ratio.`
+      );
+    }
+  }
+
   let t = 0, gold = 0, sealedRate = 0;
   let lockLevel = 0;                       // lock line = 10 * lockLevel
   const ranks = { melee: 1, ranged: 1, healer: 1 };
@@ -113,7 +150,31 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
   const healByKind = { melee: 0, ranged: 0, healer: 0, hero: 0 };
 
   const climbers = [];                      // {type, floor, prog, hp}
-  const nextSpawn = { melee: 0, ranged: 0, healer: 0 };
+  let nextReplacement = 0;
+  let capSkips = 0, replacementTicks = 0;
+
+  // The authored ratio, normalised once.
+  const comp = c.composition ?? { melee: 1, ranged: 1, healer: 1 };
+  const compTotal = comp.melee + comp.ranged + comp.healer;
+
+  const countAlive = (ty) => climbers.reduce((n, cl) => n + (cl.type === ty ? 1 : 0), 0);
+
+  // Furthest below its authored share of the LIVE stream. CONTEXT.md defines
+  // composition as the ratio of types *in the stream*, so this targets the live
+  // mix rather than the spawn sequence -- which means differential mortality
+  // (ticket 19: melee dies 1.08x as often) is corrected for instead of being
+  // allowed to drift the realised ratio away from the authored one.
+  function neediestType() {
+    const live = { melee: 0, ranged: 0, healer: 0 };
+    for (const cl of climbers) live[cl.type]++;
+    const n = climbers.length;
+    let best = 'melee', bestDeficit = -Infinity;
+    for (const ty of ['melee', 'ranged', 'healer']) {
+      const deficit = comp[ty] / compTotal - (n ? live[ty] / n : 0);
+      if (deficit > bestDeficit) { bestDeficit = deficit; best = ty; }
+    }
+    return best;
+  }
   const floors = new Map();                 // f -> {count, poolHp, respawnAt}
   const bandWindow = [];                    // rolling [t, floor, gold] for lock measurement
   const WINDOW = 60;
@@ -121,6 +182,34 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
   const samples = [];
   const events = [];
   const wallHistory = [];
+
+  // Ticket 14 instrumentation. Read-only over `floors`: materialising a floor
+  // record here would change the memory profile and the respawn behaviour we
+  // are trying to measure, so an untouched floor is counted as a full pack
+  // without being inserted.
+  const R = c.activationRadius ?? 2;
+  let prevActive = new Set();
+  let activations = 0, deactivations = 0, churnSince = 0;
+
+  function activeFloorSet() {
+    const act = new Set();
+    for (const cl of climbers) {
+      for (let f = Math.max(lockLine(), cl.floor - R); f <= cl.floor + R; f++) act.add(f);
+    }
+    if (t >= heroDeadUntil) {
+      for (let f = Math.max(lockLine(), heroFloor - R); f <= heroFloor + R; f++) act.add(f);
+    }
+    return act;
+  }
+
+  function enemyEntitiesIn(act) {
+    let n = 0;
+    for (const f of act) {
+      const st = floors.get(f);
+      n += st ? st.count : c.packSize;   // untouched floor => full pack, not materialised
+    }
+    return n;
+  }
 
   const lockLine = () => 10 * lockLevel + (lockLevel > 0 ? 1 : 0);
 
@@ -187,13 +276,23 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
   let lastDecision = 0, lastSample = 0;
 
   while (t < maxSeconds) {
-    // --- spawn ---
-    for (const ty of ['melee', 'ranged', 'healer']) {
-      const alive = climbers.reduce((n, cl) => n + (cl.type === ty ? 1 : 0), 0);
-      if (alive < c.types[ty].cap && t >= nextSpawn[ty]) {
+    // --- replacement (ticket 15 / ADR 0011) ---
+    // One interval for the whole stream. The type replaced is whichever sits
+    // furthest below its authored share of the live stream, so the ratio is a
+    // stated fact rather than something emerging from six numbers.
+    //
+    // If that type is at its ceiling the slot is SKIPPED, never passed to
+    // another type: passing it would let the replacement scheduler quietly
+    // rewrite the authored composition. A binding cap is therefore visible as a
+    // starved stream, which is the point -- it should never bind.
+    if (t >= nextReplacement) {
+      nextReplacement = t + c.replacement;
+      const ty = neediestType();
+      if (countAlive(ty) < c.types[ty].cap) {
         const hp = climberHp(c, ty, ranks[ty], M);
         climbers.push({ type: ty, floor: lockLine(), prog: 0, hp, maxHp: hp });
-        nextSpawn[ty] = t + c.types[ty].spawnInterval;
+      } else {
+        capSkips++;
       }
     }
 
@@ -415,6 +514,16 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
     // --- decisions ---
     if (t - lastDecision >= 1) { purchase(); lastDecision = t; }
 
+    // --- entity churn (ticket 14) ---
+    // Counted every tick, not every sample: activation cost is paid per
+    // transition, so sampling it at 10s intervals would miss almost all of it.
+    {
+      const act = activeFloorSet();
+      for (const f of act) if (!prevActive.has(f)) activations++;
+      for (const f of prevActive) if (!act.has(f)) deactivations++;
+      prevActive = act;
+    }
+
     // --- sampling ---
     if (t - lastSample >= sampleEvery) {
       const w = currentWall();
@@ -433,12 +542,38 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
         const n = popByType[ty] || 1;
         hpByType[ty] /= n; backByType[ty] /= n;
       }
+      // --- ticket 14: what this instant would cost as entities ---
+      const act = activeFloorSet();
+      const enemyEntities = enemyEntitiesIn(act);
+      const occupied = new Set(climbers.map((cl) => cl.floor));
+      let contested = 0;
+      for (const f of occupied) {
+        const st = floors.get(f);
+        if (!st || st.count > 0) contested++;   // climbers present AND enemies present
+      }
+      let lo = Infinity, hi = -Infinity;
+      for (const cl of climbers) { if (cl.floor < lo) lo = cl.floor; if (cl.floor > hi) hi = cl.floor; }
+      const elapsed = Math.max(t - churnSince, dt);
+
       samples.push({
         t, gold, goldEarned, peak, wall: w, wallHp, lockLine: lockLine(), sealedRate,
         pop: climbers.length, popByType, hpByType, backByType, deaths, kills,
         ranks: { ...ranks }, heroLevel, heroFloor,
         gps: goldEarned / Math.max(t, 1),
+        // ticket 14
+        activeFloors: act.size,
+        occupiedFloors: occupied.size,
+        contestedFloors: contested,
+        climberSpread: climbers.length ? hi - lo + 1 : 0,
+        enemyEntities,
+        entities: enemyEntities + climbers.length + (t >= heroDeadUntil ? 1 : 0),
+        floorRecords: floors.size,
+        activationsPerSec: activations / elapsed,
+        deactivationsPerSec: deactivations / elapsed,
+        // ticket 15: does the ceiling ever bind? It is not supposed to.
+        capSkips,
       });
+      activations = 0; deactivations = 0; churnSince = t; capSkips = 0;
       wallHistory.push(currentWall());
       lastSample = t;
     }

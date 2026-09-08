@@ -40,6 +40,11 @@ console.log('\n### Then what DOES set the death rate? (ranged column is the one 
 rates('as shipped', () => {});
 rates('ranged hp 30 -> 300 (10x tankier)', (c) => { c.types.ranged.hp0 = 300; });
 rates('ranged hp 30 -> 3 (10x squishier)', (c) => { c.types.ranged.hp0 = 3; });
-rates('ranged replacement 5s -> 15s', (c) => { c.types.ranged.spawnInterval = 15; });
-rates('ranged replacement 5s -> 2s', (c) => { c.types.ranged.spawnInterval = 2; });
+// PER-TYPE replacement no longer exists: ADR 0011 collapsed three intervals into
+// one global interval plus an authored ratio, which is exactly the lever this
+// ticket found was setting the death rate. The question survives the change --
+// "does supplying fewer/more ranged move the ranged death rate?" -- but it is
+// now asked through the RATIO, which is the only per-type supply knob left.
+rates('composition: ranged 3 -> 1 (fewer)', (c) => { c.composition = { melee: 4, ranged: 1, healer: 2 }; });
+rates('composition: ranged 3 -> 9 (more)',  (c) => { c.composition = { melee: 4, ranged: 9, healer: 2 }; });
 rates('ranged cap 30 -> 10', (c) => { c.types.ranged.cap = 10; });

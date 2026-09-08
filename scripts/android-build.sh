@@ -43,14 +43,21 @@ mkdir -p "$JNI_DIR"
 # 1. Rust -> libdot_tower.so
 # ---------------------------------------------------------------------------
 echo "==> building Rust cdylib for ${TARGET} (${PROFILE})"
+# macOS ships bash 3.2, where expanding an EMPTY array under 'set -u' is treated
+# as an unbound variable (fixed in bash 4.4). Every expansion of a
+# possibly-empty array below therefore uses the ${arr[@]+"${arr[@]}"} guard.
+# Written as an explicit 'if' rather than '[[ ]] && ...' so the false branch
+# cannot return non-zero into 'set -e'.
 RELEASE_FLAG=()
-[[ "$PROFILE" == "release" ]] && RELEASE_FLAG=(--release)
+if [[ "$PROFILE" == "release" ]]; then
+    RELEASE_FLAG=(--release)
+fi
 
 cargo ndk \
     --target "$ABI" \
     --platform "$API_LEVEL" \
     --output-dir android/app/src/main/jniLibs \
-    build "${RELEASE_FLAG[@]}"
+    build ${RELEASE_FLAG[@]+"${RELEASE_FLAG[@]}"}
 
 SO="${JNI_DIR}/libdot_tower.so"
 [[ -f "$SO" ]] || fail "expected ${SO} but cargo-ndk did not produce it."
@@ -75,7 +82,7 @@ TASK="assembleDebug"
 [[ "$PROFILE" == "release" ]] && TASK="assembleRelease"
 
 echo "==> ${GRADLE_CMD} ${TASK}"
-"$GRADLE_CMD" "$TASK" "${NDK_ARG[@]}"
+"$GRADLE_CMD" "$TASK" ${NDK_ARG[@]+"${NDK_ARG[@]}"}
 
 APK=$(find app/build/outputs/apk -name '*.apk' -type f | head -1)
 [[ -n "$APK" ]] || fail "Gradle reported success but produced no APK."

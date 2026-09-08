@@ -132,7 +132,10 @@ write_env() {
   touch "$ENV_FILE"
   tmp=$(mktemp)
   grep -vE "^${key}=" "$ENV_FILE" > "$tmp" || true
-  printf '%s=%s\n' "$key" "$value" >> "$tmp"
+  # Values are quoted: BRINGUP_DEVICE holds strings like
+  # 'Pixel 10 Pro (Android 17, API 37)', and an unquoted '(' is a syntax error
+  # when android-build.sh / android-run.sh 'source .env' under 'set -e'.
+  printf '%s="%s"\n' "$key" "${value//\"/\\\"}" >> "$tmp"
   mv "$tmp" "$ENV_FILE"
   WRITTEN_ENV+=("$key")
   printf '  %s✓ wrote%s %s → %s\n' "$GREEN" "$RESET" "$key" "$ENV_FILE"
@@ -320,9 +323,26 @@ else
     confirm "Run 'brew install gradle' now?" && brew install gradle || SKIPPED+=("gradle")
   }
   if command -v gradle >/dev/null 2>&1; then
-    ( cd android && JAVA_HOME="${JAVA_HOME_PATH:-${JAVA_HOME:-}}" gradle wrapper --gradle-version 8.14.3 ) \
-      && note "wrapper generated" \
-      || SKIPPED+=("gradle wrapper (cd android && gradle wrapper --gradle-version 8.14.3)")
+    # Bootstrap in a scratch dir, NOT in android/. Homebrew's Gradle is 9.x,
+    # and AGP 8.13.2 relies on org.gradle.api.problems.internal.InternalProblems,
+    # removed in Gradle 9.6.0 — so running 'gradle wrapper' inside android/
+    # fails while applying com.android.application, before it can emit anything.
+    # A scratch dir has no build script to configure, so any Gradle can generate
+    # a wrapper pinned to 8.14.3, which IS AGP-8.13-compatible. One-time cost.
+    BOOT=$(mktemp -d)
+    printf "rootProject.name = 'wrapperboot'\n" > "$BOOT/settings.gradle"
+    if ( cd "$BOOT" && JAVA_HOME="${JAVA_HOME_PATH:-${JAVA_HOME:-}}" \
+           gradle wrapper --gradle-version 8.14.3 >/dev/null 2>&1 ); then
+      mkdir -p android/gradle/wrapper
+      cp "$BOOT/gradlew" "$BOOT/gradlew.bat" android/
+      cp "$BOOT/gradle/wrapper/gradle-wrapper.jar" \
+         "$BOOT/gradle/wrapper/gradle-wrapper.properties" android/gradle/wrapper/
+      chmod +x android/gradlew
+      note "wrapper generated (bootstrapped outside android/)"
+    else
+      SKIPPED+=("gradle wrapper — see ticket 04 for the scratch-dir bootstrap")
+    fi
+    rm -rf "$BOOT"
   fi
 fi
 pause "Press Enter to continue"

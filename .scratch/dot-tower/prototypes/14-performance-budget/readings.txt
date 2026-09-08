@@ -1,0 +1,98 @@
+=== 1. A normal campaign ===
+14 runs, compounding prestige, the slice's shipped hero.
+
+run  peak   pop  entities(max)  active  contested  spread  act/s  records
+  1    147    90            145      34          6      59   0.88       64
+  2    218    90            153      52          8      87   1.27       88
+  3    310    90            166      66          9     113   1.56      115
+  4    440    90            192      82          7     161   1.81      163
+  5    617    90            186      93          6     221   2.30      225
+  6    821    90            201     106          5     293   2.85      294
+  7    606    90            143      88          2     231   1.25      231
+  8    727    90            147      97          2     268   1.49      273
+  9   1022    90            164     129          2     371   1.84      373
+ 10   1187    90            182     128          3     373   2.00      430
+ 11   1151    90            151      98          1     420   1.41      421
+ 12   1302    90            143      95          2     471   1.53      472
+ 13   1455    90            135      90          1     524   1.32      525
+ 14   1617    90            147      92          2     572   1.32      581
+
+Across all 5938 samples:
+  entities   mean 126  p95 163  MAX 201
+  prediction 1,100 worst case  ->  measured max is 18.3% of it
+  activation churn  mean 1.87/s  max 6.53/s
+  deepest floor reached 1617, largest band 581 floor records
+
+The worst single sample (t=10732s, floor 821):
+  201 entities = 113 enemies + 87 climbers + hero
+  103 active floors, 5 contested, climbers spread over 284
+
+=== 2. The load-bearing claim: does band height matter? ===
+Ticket 03: "entity count stays in the low hundreds whether the band is
+20 floors or 5,000". Prestige is what drives the band deep and wide, so
+force it directly rather than waiting for a campaign to get there.
+
+prestige x   peak   band  entities(max)  active(max)  contested(max)  churn/s
+      1e+0    147     64            145           34               6     0.88
+      1e+1    245     92            161           60               7     1.49
+      1e+2    374    135            172           79               7     1.80
+      1e+3    506    185            186           92               8     2.11
+      1e+4    638    231            176           93               6     2.04
+      1e+5    798    286            206          112               7     2.80
+      1e+6    549    211            139           87               2     1.30
+      1e+9    979    359            155          117               1     1.62
+     1e+12   1093    403            151           88               2     1.42
+
+band grew 6x (64 -> 403 floors)
+entities grew 1.04x (145 -> 151)
+
+=== 3. Why a thin spread is free ===
+Ticket 14 Q2 worried that if climbers spread thin instead of clumping,
+activation churn would be much higher than predicted. They DO spread
+thin. Here is what the active floors actually contain.
+
+worst sample of a deep run (floor 611):
+  climbers spread over        181 floors
+  floors active (spread +-2)   62
+  of those, CONTESTED         4
+  enemy entities              86  (1.39 per active floor, pack size 4)
+  climber entities            89
+  TOTAL                       176
+
+An active floor holds far less than a full pack because trailing
+climbers walk through ground the leaders already cleared. Spread costs
+activation events, not entities -- and the events are cheap.
+
+=== 4. What sets the crowd, and does the ceiling bind? ===
+The model now runs ticket 15's mechanism: ONE global replacement
+interval against an authored ratio, with per-type caps surviving only as
+a ceiling that ADR 0011 says should never bind. So `replacement` is the
+crowd dial, not the caps -- and whether the ceiling binds is testable.
+
+replacement  crowd  entities(max)  active(max)  churn/s  capSkips/sample
+       0.50     88            151           59     1.59            17.22
+       1.00     88            167           76     2.02             7.84
+       1.67     88            176           93     2.04             3.90
+       3.00     87            210          138     2.87             1.28
+       5.00     81            205          160     2.50             0.09
+
+--- and the ceiling, under both lock curves ---
+Ticket 15 predicted the cap "stops binding entirely" under the FIXED lock
+curve (lockCostBase 2.5), which is ticket 20's open work.
+
+lock curve      run    peak   crowd   m/r/h     capSkips/sample
+default (4.0)  run 1     147      82 37/27/18            2.90
+default (4.0)  run 6     750      87 39/29/19            4.15
+FIXED (2.5)    run 1     142      34  15/11/8            0.00
+FIXED (2.5)    run 6    1220       9    4/3/2            0.00
+
+ADR 0011 is right, and it is CONDITIONAL on the lock curve. Under the
+default curve the ceiling binds constantly and the crowd is pinned at 90.
+Under the fixed curve it never binds once and the live mix settles on the
+authored ratio exactly -- which is what "authored" is supposed to mean.
+
+=== 5. Memory for inert floor data (Q5) ===
+     403 floors x 16B = 6.3 KiB
+    5000 floors x 16B = 78.1 KiB
+   50000 floors x 16B = 781.3 KiB
+  (ticket 14 asks about 5,000 floors; the deepest band above was 403)

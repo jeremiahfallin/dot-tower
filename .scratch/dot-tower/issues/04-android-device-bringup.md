@@ -1,7 +1,7 @@
 # Bevy hello-world on a physical Android device
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 01
 
 ## Question
@@ -26,6 +26,67 @@ Two questions that could not be settled from source and need real hardware:
 Verify the save-durability chain empirically: log timestamps either side of the save write in the `AppLifecycle::Suspended` handler and compare against logcat lifecycle lines. Each link is verified in source; the composition is inference.
 
 Also note Bevy's example Gradle targets API 33, while Google Play requires API 36 for updates from **2026-08-31**. Bringup should target API 36 rather than inheriting the example's config.
+
+## Answer
+
+**Resolved.** A minimal Bevy 2D app builds, installs, launches and takes touch
+input on a physical Android device. The toolchain is recorded, the build chain
+works end to end, and the two probes that do not depend on the UI layer both
+pass.
+
+**Toolchain that worked.** `cargo-ndk` 4.1.2 + Gradle with `GameActivity`, Rust
+1.97.1, NDK 30.0.15729638, compileSdk/targetSdk 36, Gradle wrapper pinned to
+8.14.3 (AGP 8.13.2 cannot run on Homebrew's Gradle 9.7.1). Commands are
+`scripts/android-setup.sh`, `scripts/android-build.sh`, `scripts/android-run.sh`.
+
+**Device.** Pixel 10 Pro, Android 17 / API 37, Tensor G5 with a PowerVR D-Series
+DXT-48-1536 MC1 on the Vulkan backend, 8 cores / 15.2 GiB. Gradle 16s
+incremental; the cold Rust cdylib build was never timed and is owed to
+[ticket 14](14-android-performance-budget.md), which needs a clean rebuild anyway.
+
+**Probe A — touch transport: pass, partially read.** Press and drag moves the
+sprite on device. `max_fingers = 1` is the only reading captured; the edge
+coordinates and the multi-finger maximum are printed on a HUD that does not
+render, and go to [ticket 22](22-bevy-ui-android-rendering.md).
+
+**Probe E — save durability: pass, and it closes ticket 01's inference.**
+`AppLifecycle::Suspended` is a genuine synchronous save hook: the write plus
+`sync_all()` completed in **2 ms**, comfortably inside a 16.7 ms frame, and the
+file was verified on device via `run-as`. `WillSuspend` was **never delivered**,
+exactly as [ticket 01](01-bevy-android-support.md) predicted — had it appeared,
+[ticket 12](12-save-schema.md)'s design would have needed reworking. It stands.
+`internal_data_path()` resolves to `/data/user/0/dev.dottower/files/`, confirming
+on hardware the writable location ticket 12 asserted from source.
+
+**Every `cfg(target_os = "android")` path now compiles**, including
+`content_rect()` and `internal_data_path()`, which ticket 04 previously had to
+record as compile-unverified for want of an NDK.
+
+**Four build-chain defects, all fixed and all scripting faults** — none was Bevy,
+the NDK, or the device: an ungeneratable Gradle wrapper (AGP 8.13.2 versus Gradle
+9.7.1), unquoted `.env` values breaking every `source` under `set -euo pipefail`,
+macOS bash 3.2 aborting on empty-array expansion under `set -u`, and a Kotlin
+stdlib duplicate-class collision in a project that uses no Kotlin. Details in the
+comments below; they are the kind of thing that only appears on a real machine
+and would cost the next person a day.
+
+**What this ticket did not settle, and where it went.** `bevy_ui` does not render
+on this device, which took probes B, C and D down with it and left probe A half
+read. That is an open-ended graphics investigation rather than a bringup detail,
+so it moved to [ticket 22](22-bevy-ui-android-rendering.md) (prototype) together
+with every reading gated behind it — **including probes C and D, which ticket 02
+added here** — and [ticket 23](23-upstream-bevy-ui-android.md) (research) covers
+the upstream half in parallel. Ticket 22 also inherits the consequences ticket 04
+was holding for [ticket 13](13-bevy-version-target.md)'s reasoning and for the UI
+foundation in tickets 02 and 10.
+
+One finding from probe C stands regardless of how that resolves: winit logs
+`TODO: handle Android InsetsChanged` and `TODO: find a way to notify application
+of content rect change`, so insets and content-rect changes are **never delivered
+to the application**. The safe-area handling ticket 02 budgeted at ~40 lines must
+**poll** `AndroidApp::content_rect()`; it cannot be event-driven.
+
+Status: resolved
 
 ## Comments
 
@@ -112,3 +173,319 @@ the addenda from tickets 01 and 02:
    wrong and ticket 12's save design changes).
 7. Probe F — any `bevy_ui` flicker against the sprite layer (#14710 on wgpu 29).
 8. Any workaround needed to get there.
+
+### Claim transferred; first run on hardware (session of 2026-08-21)
+
+The session that claimed this on 2026-08-18 is gone; the dev confirmed it no
+longer exists and reassigned the ticket here. Still `claimed`, **not
+`resolved`** — probe F is failing and it has taken probes B, C and D down with
+it.
+
+**It runs.** APK built, installed and launched on a physical device. The build
+chain works end to end.
+
+#### 1. Device and build
+
+| | |
+|---|---|
+| Device | Pixel 10 Pro |
+| OS | Android 17, API **37** (ahead of the compileSdk/targetSdk 36 we build against) |
+| SoC / GPU | Tensor G5 — **PowerVR D-Series DXT-48-1536 MC1**, Vulkan backend |
+| CPU / RAM | 8 cores / 15.2 GiB |
+| `.so` (debug, unstripped) | 1.4 GB |
+| `.so` in APK (AGP-stripped) | 75 MB |
+| APK | 79 MB |
+| Gradle | 16s incremental (36 tasks) |
+| Rust cdylib, cold for `aarch64-linux-android` | **8m 07s** wall (2,896s CPU, ~5.9x parallel), debug profile — measured 2026-09-07 by ticket 14 |
+
+**The Android code paths compile.** Ticket 04 previously recorded every
+`cfg(target_os = "android")` path as compile-unverified for want of an NDK.
+They now build, including `content_rect()` and `internal_data_path()`.
+
+#### 2. Probe A — touch transport: **PASS (partial)**
+
+Press and drag moves the sprite; confirmed by hand on the device.
+`max_fingers = 1` is the only reading captured so far. **Edge-coordinate
+behaviour (#7528) and the multi-finger high-water mark are not yet assessed** —
+both are read off the HUD, which probe F has destroyed.
+
+#### 3. Probe B — UI picking per finger: **BLOCKED by probe F**
+
+The four ability buttons do not render at all, so two-finger `PointerId::Touch`
+distinctness is untested. This is the reading ticket 02's `Interaction` ban
+depends on, and it remains an inference.
+
+#### 4. Probe C — safe area: **BLOCKED by probe F**, plus a finding that stands regardless
+
+The red frame does not render, so `content_rect()` versus the cutout is
+unanswered. Independently, winit logs on this device:
+
+```
+WARN winit::platform_impl::android: TODO: handle Android InsetsChanged notification
+WARN winit::platform_impl::android: TODO: find a way to notify application of content rect change
+```
+
+So insets and content-rect changes are **never delivered to the application**.
+Whatever safe-area handling ticket 02 budgeted (~40 lines) has to **poll**
+`AndroidApp::content_rect()`; it cannot be event-driven. That holds no matter
+how probe F resolves.
+
+#### 5. Probe D — text crispness: **BLOCKED by probe F**
+
+No legible text to judge.
+
+#### 6. Probe E — save durability: **PASS, and it closes ticket 01's inference**
+
+```
+probe E: AppLifecycle::Suspended
+probe E: saved in 2ms -> /data/user/0/dev.dottower/files/bringup-probe.txt
+```
+
+File verified present on device (57 bytes, correct contents) via `run-as`.
+
+- `AppLifecycle::Suspended` **is** a genuine synchronous save hook. Ticket 01
+  verified each link in source and called the composition inference; it is now
+  measured on hardware.
+- **`WillSuspend` was never delivered**, as ticket 01 predicted. Had it appeared,
+  ticket 12's design would have needed reworking. It stands.
+- **2 ms**, comfortably inside a 16.7 ms frame — the budget ticket 01 flagged as
+  unquantified by any source.
+- `internal_data_path()` resolves to `/data/user/0/dev.dottower/files/`,
+  confirming on hardware the writable location ticket 12 asserted from source.
+
+#### 7. Probe F — bevy_ui flicker: **FAIL**
+
+**The sprite layer renders correctly; the `bevy_ui` layer does not.** HUD text
+appears as scattered glyph fragments that differ on every frame; the four
+ability buttons and the red safe-area frame do not render at all. Three
+screenshots three seconds apart hash differently, so this is live corruption
+rather than a static glyph bug. **No wgpu error, no Vulkan validation failure,
+no naga warning** — logcat filtered to the app's pid is silent. The harness is
+not the cause: the HUD is a single `Text` whose string is rebuilt each frame,
+not a respawn loop.
+
+This is bigger than a bringup detail. **Ticket 13 chose 0.19.1 specifically
+because #14710 (bevy_ui Android flicker) was fixed transitively via wgpu 29** —
+that was the argument that rejected 0.18. Tickets 02 and 10 then built the whole
+UI approach on `bevy_ui` + `bevy_picking`.
+
+Not yet generalisable: **one device, one GPU, one build.** Candidate causes are
+#14710 unfixed, a PowerVR-specific bug, or an interaction with the harness's
+`UiAntiAlias::Off` + `Msaa::Off` + `FontSmoothing::None`. Cheapest isolating
+tests, in order: run the same build on desktop and check HUD legibility; then
+flip those three settings to defaults on device; then a second handset on a
+different GPU vendor.
+
+#### The Adreno constraint cannot be tested on this device
+
+The map's standing preference — *no custom `Material2d`, it crashes on Adreno
+GPUs* (#22925) — is unverifiable here. Tensor G5 is **PowerVR**, not Adreno. The
+bringup handset cannot validate the hardest GPU constraint in the Notes, and
+buying that assurance needs a second device.
+
+#### 8. Workarounds required to get this far
+
+Four defects blocked the first run. Three were scripting faults that only appear
+on a real machine; none were Bevy, the NDK, or the device.
+
+1. **Gradle wrapper was never generated.** Homebrew installs Gradle **9.7.1**;
+   AGP 8.13.2 uses `org.gradle.api.problems.internal.InternalProblems`, removed
+   in Gradle **9.6.0**. `gradle wrapper` inside `android/` died applying the
+   Android plugin — before it could create the 8.14.3 wrapper that would itself
+   have been compatible. Fixed by bootstrapping the wrapper in a scratch
+   directory with no build script to configure, then copying it in.
+   `scripts/android-setup.sh` now does this.
+2. **`.env` values were written unquoted.** `write_env` produced
+   `BRINGUP_DEVICE=Pixel 10 Pro (Android 17, API 37)`; an unquoted `(` is a hard
+   bash syntax error, and both build scripts `source .env` under `set -euo
+   pipefail`. The device-detection stage meant to help later steps was breaking
+   them. `write_env` now quotes.
+3. **macOS bash 3.2 and empty arrays.** `/usr/bin/env bash` resolves to
+   `/bin/bash` 3.2.57, where expanding an empty array under `set -u` is an
+   unbound-variable error (fixed in bash 4.4). `"${RELEASE_FLAG[@]}"` aborted
+   every debug build before `cargo ndk` ran. Both sites in
+   `scripts/android-build.sh` now use the `${arr[@]+"${arr[@]}"}` guard.
+4. **Kotlin stdlib duplicate classes.** `appcompat 1.7.0` →
+   `lifecycle-common 2.6.2` → `kotlinx-coroutines-android 1.6.4` requests
+   `kotlin-stdlib-jdk7/jdk8:1.6.21`, whose classes were merged into
+   `kotlin-stdlib` in Kotlin 1.8.0; alongside the 1.8.22 stdlib this fails
+   `:app:checkDebugDuplicateClasses`. Constrained both to 1.8.22 (empty shims
+   delegating to `kotlin-stdlib`) in the version catalogue. This project uses no
+   Kotlin — the pin exists only to settle a transitive graph.
+
+Also of note: Gradle warns the build uses features *"incompatible with Gradle
+9.0"*. That is the same AGP-8.13-vs-Gradle-9 fault line seen from the other
+side, so the 8.14.3 wrapper pin is load-bearing — a future upgrade must move AGP
+and Gradle together.
+
+**Files changed:** `scripts/android-setup.sh`, `scripts/android-build.sh`,
+`android/app/build.gradle`, `android/gradle/libs.versions.toml`, plus new
+`android/gradlew`, `android/gradlew.bat`, `android/gradle/wrapper/`. The wrapper
+jar is currently untracked and conventionally should be committed, or a fresh
+clone repeats the bootstrap. `android/gradle.properties` picked up
+`ndkVersion=30.0.15729638` from the setup script.
+
+#### What this ticket still owes
+
+Probes B, C and D, all gated behind probe F; probe A's edge coordinates and
+multi-finger maximum, same gate; and a properly timed cold Rust build. Probe F
+is the critical path — nothing else can be read until `bevy_ui` renders.
+
+### Probe F narrowed: not the harness, not the render settings (session of 2026-08-21)
+
+Two controlled runs, and between them they eliminate both benign explanations.
+
+**Control 1 — same build on desktop: renders correctly.** macOS 15.1, Apple M3,
+Metal backend, "GPU preprocessing is fully supported on this device" (against
+"Some GPU preprocessing are limited" on the Pixel). HUD text legible, all four
+ability buttons present, sprite drags on click. Identical Bevy version,
+identical UI code, identical settings. **The harness is exonerated** — this is
+not a mistake in how the UI is built.
+
+**Control 2 — Bevy default render settings on device: still corrupt.**
+`Msaa::Off` + `UiAntiAlias::Off` + all three `FontSmoothing::None` reverted to
+defaults, rebuilt, reinstalled. Glyph edges came back anti-aliased, confirming
+the change took effect — and the corruption is unchanged in character: scattered
+fragments differing frame to frame, no buttons, no safe-area frame. **The
+pixel-art triple is exonerated.** Ticket 02's day-one rendering settings are not
+the cause, so they need no revisiting on this account.
+
+Experiment reverted; `src/lib.rs` is back to its committed state.
+
+#### Where that leaves probe F
+
+`bevy_ui` is broken on this device **independent of render configuration and
+independent of the harness**. The sprite layer renders correctly throughout, so
+this is specific to the UI pass. Still silent — no wgpu error, no Vulkan
+validation failure, no naga warning.
+
+What is *not* yet distinguished: whether this is **#14710 unfixed**, or a
+**distinct PowerVR-specific bug**. Both are consistent with everything observed.
+Separating them needs a second handset on a different GPU vendor — and that same
+device would also settle the Adreno `Material2d` crash (#22925) that this
+PowerVR device cannot test. **One borrowed Adreno phone answers both questions**,
+which makes it the cheapest next move by some distance.
+
+#### Consequence for ticket 13, which is closed
+
+Ticket 13 chose 0.19.1 over 0.18 on a single deciding argument: that #14710
+(bevy_ui Android flicker) was fixed transitively via wgpu 29, which 0.18 pins too
+old to receive. On hardware, `bevy_ui` does not render correctly on Android.
+
+This does **not** overturn the version choice — 0.19.1 remains at least as good
+as 0.18, and nothing here argues for going back. What it overturns is the
+*reason*: the fix that justified the upgrade is not observable on this device.
+Whether ticket 13 needs amending waits on the second-device test, since a
+PowerVR-only bug would leave its reasoning intact.
+
+Tickets 02 and 10 both build on `bevy_ui` + `bevy_picking`. Neither is
+invalidated yet — but if the second device also corrupts, the UI foundation is
+in question with no obvious replacement, because ticket 02 banned the
+`Interaction` path for multi-touch reasons (#11553) that still hold.
+
+### Proposal: split probe F out of this ticket (session of 2026-08-21)
+
+**Not acted on — this is a proposal for whoever picks the ticket up next.** It
+proposes a resolution, two new tickets and a rewiring, and this session has
+already spent its one resolution on ticket 12.
+
+#### The case for splitting
+
+This ticket asks one thing: *get a minimal Bevy 2D app — a sprite and a touch
+handler that moves it — building, installing and running on a real Android
+device.* **That question is answered.** It builds, installs, launches, takes
+touch input, drags the sprite, and completes a synchronous save on suspend in
+2 ms. The toolchain, the device, the build times and four separate build-chain
+defects are all recorded above.
+
+Probe F is a different animal. It was *discovered* by bringup, but "why does
+`bevy_ui` fail to render on Android" is an open-ended graphics investigation
+with no known size, and it is now the only thing keeping this ticket open.
+
+The cost of leaving them fused is concrete: **[Low-end Android performance
+budget](14-android-performance-budget.md) is blocked by this ticket**, and has
+nothing whatever to do with a UI rendering bug. A hello-world that runs and
+takes touch input is exactly the instrument a performance budget needs, and it
+exists today. One unrelated bug is holding a frontier ticket hostage.
+
+#### Proposed shape
+
+1. **Resolve this ticket** on the bringup facts already recorded.
+
+2. **Open "Why bevy_ui does not render on Android"** (`prototype`), which
+   inherits everything gated behind probe F — including the probe readings this
+   ticket would otherwise abandon:
+   - probes **B**, **C** and **D**, all unreadable while the HUD is corrupt;
+   - probe **A**'s remainder — edge-coordinate sanity (#7528) and the
+     multi-finger high-water mark.
+
+   **This matters to ticket 02, which must not lose its questions.** Probes C
+   and D were *added to this ticket by ticket 02* — `content_rect()` versus
+   display cutouts, and the `UiScale` value giving crisp pixel text. They travel
+   with the new ticket rather than dying with this one.
+
+   First moves, cheapest first, none needing hardware we lack:
+   - **Vulkan versus GLES.** Compiled backends are `vulkan`, `metal`, `dx12`,
+     `webgl` — **no `gles`**, so every observation so far is Vulkan-only.
+     Enabling wgpu's `gles` feature (via a direct `wgpu` dependency for feature
+     unification; Bevy does not expose it) would say whether this is a
+     Vulkan-path bug. Strongest narrowing available for the effort.
+   - **Bevy 0.18 versus 0.19 on the same device.** Goes straight at ticket 13's
+     argument. If 0.18 corrupts identically, #14710 was never the operative
+     issue and 0.19.1 is simply not worse. If 0.18 is clean, this is a 0.19
+     regression and ticket 13's decision is actively harmful.
+   - **A minimal repro** — one solid-colour UI node, no text. The buttons never
+     rendered either, so this is likely all of `bevy_ui` rather than the glyph
+     atlas, but an upstream report needs the smallest case.
+   - **A second GPU vendor, cheaply.** No adb or loan required: the corruption
+     is visible to the naked eye, so mailing the APK to anyone with a Snapdragon
+     (Adreno) or MediaTek/Exynos (Mali) handset and asking for a photo is the
+     whole test. Firebase Test Lab's free tier is the fallback, and is also the
+     only realistic way to ever test the Adreno `Material2d` crash (#22925) that
+     this PowerVR device structurally cannot.
+
+3. **Open "Upstream state of bevy_ui on Android"** (`research`, AFK) — is #14710
+   actually closed, against which wgpu, and are there existing reports of
+   `bevy_ui` corruption on PowerVR/Tensor hardware? Independent of the device,
+   so it can run in parallel from the moment it exists. Research tickets are the
+   one type a session may resolve several of.
+
+4. **Rewiring.** [Low-end Android performance budget](14-android-performance-budget.md)
+   becomes takeable as soon as this ticket resolves. Ticket 13's amendment — and
+   any reconsideration of tickets 02 and 10 — blocks on the new prototype ticket
+   instead of on this one.
+
+#### What splitting does not do
+
+It does not downgrade probe F. `bevy_ui` failing on Android is serious and, on
+current evidence, **must be fixed regardless of which vendors it affects** — the
+Pixel is a mainstream handset and a shipping target, so a PowerVR-only bug is
+still a shipping bug. The split moves it somewhere it can be worked properly,
+rather than leaving it as the last unchecked box on a ticket whose own question
+was answered hours ago.
+
+### Split executed (session of 2026-09-07)
+
+The proposal above is no longer a proposal. Ticket 04 is resolved on its own
+question; [ticket 22](22-bevy-ui-android-rendering.md) and
+[ticket 23](23-upstream-bevy-ui-android.md) are open and carry everything that
+was gated behind probe F. [Ticket 14](14-android-performance-budget.md) lists
+only this ticket as a blocker and is therefore takeable now — it needs a
+hello-world that runs and takes touch input, which exists, and it never needed a
+working UI layer.
+
+One thing changed since the proposal was written, and it changes ticket 22's
+opening move. A **Godot probe harness carrying the same probes A-F** now exists
+at [`prototypes/04-godot-probe/`](../prototypes/04-godot-probe/), with its export
+chain verified end to end and a signed APK under a package id distinct from this
+harness's, so both can sit on the phone at once. It was built to answer a
+different question — whether the project would be easier in Godot — but as an
+instrument it is a **cross-engine control** for probe F: if Godot composites a UI
+layer correctly on this device, the device and driver are exonerated and the
+fault is Bevy's; if it corrupts too, probe F is not a Bevy problem at all. That
+is a sharper first cut than anything in the original list and it needs no second
+handset, so it leads ticket 22's first moves.
+
+The engine question itself is **not** settled and is not what ticket 22 is for.
+Nothing in the design work is engine-specific — no ADR and no other ticket turns
+on it — so the choice can wait for probe F rather than front-run it.

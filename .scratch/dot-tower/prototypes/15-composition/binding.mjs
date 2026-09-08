@@ -41,7 +41,11 @@ for (const [label, M, min] of [['Run 1', 1, 40], [`Run 6 (M=${M5.toExponential(1
   probe('lock cost base 4.0 -> 2.5', (c) => { c.lockCostBase = 2.5; }, M, min);
   probe('lock margin 15 -> 3', (c) => { c.lockMargin = 3; }, M, min);
   console.log('  -- supply --');
-  probe('replacement 5s -> 2s', (c) => { for (const t of ['melee','ranged','healer']) c.types[t].spawnInterval = 2; }, M, min);
-  probe('replacement 5s -> 15s', (c) => { for (const t of ['melee','ranged','healer']) c.types[t].spawnInterval = 15; }, M, min);
+  // Ticket 15's own recommendation is now implemented in the model: one global
+  // interval replaced three per-type ones. These two probes are the same
+  // question in the new vocabulary -- 0.67s and 5.0s reproduce the aggregate
+  // inflow the old 2s and 15s per-type intervals gave.
+  probe('replacement 1.67s -> 0.67s', (c) => { c.replacement = 0.67; }, M, min);
+  probe('replacement 1.67s -> 5.0s', (c) => { c.replacement = 5.0; }, M, min);
   probe('respawn timer 20s -> 5s', (c) => { c.respawnTimer = 5; }, M, min);
 }

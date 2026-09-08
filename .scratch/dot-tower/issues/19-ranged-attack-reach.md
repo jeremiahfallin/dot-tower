@@ -129,3 +129,31 @@ contradicts, and it is now a knob (`failedFloorReset`) rather than an absence.
 Prototype: `.scratch/dot-tower/prototypes/19-ranged-reach/`. Ticket 06's `model.mjs` extended
 with reach, standoff, formation targeting and per-type instrumentation, all defaulting off —
 ticket 08's run-1 peak of 147 still reproduces exactly.
+
+## Amended by ticket 15's mechanism landing (session of 2026-09-07)
+
+`model.mjs` now runs one global replacement interval against an authored ratio
+(ADR 0011) instead of three per-type spawn intervals. **This ticket's headline
+lever no longer exists**: "per-type replacement sets the death rate" was measured
+through `types.ranged.spawnInterval`, and ADR 0011 abolished per-type supply.
+
+The question survives the change and was re-asked through the only per-type
+supply knob left, the **ratio**. `safety.mjs` is updated accordingly, and the
+finding holds — more strongly than before:
+
+- **As shipped, melee now dies 1.00× as often as ranged** (was 1.08×). Ranged is
+  not safer, which was this ticket's central claim.
+- **Supply still sets the death rate.** Ratio `ranged 3 → 9` drives deaths per
+  live climber from 8.3 to 11.5 *for every type*; a 100× ranged health swing
+  (300 vs 3) moves it 7.0 to 11.6. Survival is a property of the stream, not of
+  the climber type.
+
+**Depth results are intact**, which is where this ticket's conclusions live: at
+run 6, baseline peak 827 → 821, reach ±2 828 against a baseline of 821 (still
+inert), standoff 2 680 → 685 (still ~17% down).
+[ADR 0010](../../docs/adr/0010-combat-is-floor-local-and-has-no-reach.md) stands.
+
+Run-1 figures moved around considerably. That is expected rather than alarming:
+this ticket already established that run-1 comparisons are untrustworthy unless
+pinned to identical wall-clock time, and it is the reason the resolution rests on
+the depth numbers.

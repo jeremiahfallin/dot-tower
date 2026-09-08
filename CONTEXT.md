@@ -119,6 +119,14 @@ _Avoid_: HUD, status bar, panel, ticker
 The span of play between two prestiges.
 _Avoid_: Session, attempt, life
 
+**Account**:
+Everything that outlives a **prestige** — the cumulative prestige multiplier, the deepest floor
+ever reached, and the relics held with their ranks. It is the counterpart to **run**: between them
+they partition all progress, so every quantity the player owns belongs to exactly one of the two,
+and prestige is precisely the act of discarding the run and keeping the account. What the player
+watches mature across many runs.
+_Avoid_: Profile, meta, save, permanent progress
+
 **Prestige**:
 Deliberately ending a run to convert its progress into a permanent multiplier. Resets gold, floor progress, locks, climber ranks, and hero levels.
 _Avoid_: Rebirth, ascension, reset

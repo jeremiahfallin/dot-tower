@@ -1,0 +1,5 @@
+# Godot's import cache and the exported artefacts. `.scratch/` is deliberately
+# tracked (it is this repo's issue tracker), so these have to be excluded here
+# rather than inherited from the root .gitignore.
+/.godot/
+/build/

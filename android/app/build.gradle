@@ -60,4 +60,12 @@ android {
 dependencies {
     implementation libs.appcompat
     implementation libs.games.activity
+
+    // Constraints, not dependencies: nothing here uses Kotlin directly. These
+    // only raise the transitive kotlin-stdlib-jdk7/jdk8 to match the
+    // kotlin-stdlib already on the classpath. See libs.versions.toml.
+    constraints {
+        implementation libs.kotlin.stdlib.jdk7
+        implementation libs.kotlin.stdlib.jdk8
+    }
 }

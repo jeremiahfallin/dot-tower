@@ -1,7 +1,7 @@
 # Why bevy_ui does not render on Android
 
 Type: prototype
-Status: open
+Status: claimed
 
 ## Question
 
@@ -112,3 +112,196 @@ Ticket 04 was holding these; they block here now.
 vendors it affects**. The Pixel is a mainstream handset and a shipping target, so
 a PowerVR-only bug is still a shipping bug. Splitting moved this somewhere it can
 be worked properly; it did not lower its priority.
+
+## Comments
+
+### A mechanism, derived from source, and the build that tests it (session of 2026-09-08)
+
+**No device was attached this session**, so none of the five first moves could
+be *completed* — every one of them ends in looking at the phone. Rather than
+stop, this session went at the question the moves were meant to answer
+indirectly, and found a candidate mechanism in the Bevy source. It is built,
+desk-verified and packaged as an APK. **The verdict needs the handset and one
+minute of someone's time.**
+
+Ticket stays `claimed` only to match ticket 04's precedent for the same
+situation. **Take it over freely — there is no continuity to preserve.**
+
+#### The finding
+
+`bevy_ui` and `bevy_sprite` draw into the same frame, on the same device, with
+the same driver. One is correct and one is corrupt. **Their vertex layouts differ
+in alignment** — see the caveat below, which ticket 23 was right to press on.
+
+`bevy_sprite_render` hand-writes its layout: five `Float32x4` at bytes 0, 16,
+32, 48, 64, stride 80. Every attribute 16-byte aligned, and the stride is a
+multiple of 16 so that holds at every vertex index.
+
+`bevy_ui_render` builds its layout with `VertexBufferLayout::from_vertex_formats`,
+which packs tightly — `offset += format.size()`, no padding. For the UI
+attribute list that yields:
+
+| loc | field | format | offset | 16-aligned |
+|-----|-------|--------|--------|------------|
+| 2 | color | `Float32x4` | 20 | **no** |
+| 4 | border radius | `Float32x4` | 40 | **no** |
+| 5 | border thickness | `Float32x4` | 56 | **no** |
+
+Stride **88** — not a multiple of 16, so the misalignment also shifts from one
+vertex to the next. **Not one vec4 in the UI layout is 16-byte aligned; every
+vec4 in the sprite layout is.** Those numbers are measured by a test that
+reproduces upstream's arithmetic, not computed by hand.
+
+**Claim: the PowerVR D-Series driver mis-fetches vec4 vertex attributes that are
+not 16-byte aligned, silently.**
+
+It fits every observation ticket 04 recorded, including the two that were
+hardest to explain:
+
+- ~~**The silence.**~~ **Withdrawn by [ticket 23](23-upstream-bevy-ui-android.md).**
+  This was listed here as evidence and is not. wgpu loads
+  `VK_LAYER_KHRONOS_validation` only if it finds it and logs its absence at
+  `log::debug!`, below Bevy's filter; stock retail Android does not ship that
+  layer; and the modern attribute-alignment VUs (`-10389`, `-10390`) are
+  unimplemented in the validation layers anyway. "No validation failure" most
+  likely means **"no validation layer."** It discriminates nothing.
+- **Buttons rendering as *nothing*, not as garbage.** With `radius` and `border`
+  garbage, `sd_inset_rounded_box` returns garbage and both `draw_uinode_*`
+  functions end in `saturate(color.a * t)`. A `t` of zero is a fully transparent
+  node. Solid-colour nodes vanish; textured text still samples the glyph atlas
+  and survives as fragments — which is exactly what was seen.
+- **Frame-varying.** The UI vertex buffer is rewritten every frame, so a fetch
+  reading the wrong bytes reads *different* wrong bytes each frame.
+- **All of `bevy_ui`, not just text.** All five UI pipelines (`ui`,
+  `box_shadow`, `gradient`, `ui_texture_slice`, `ui_material`) begin
+  `Float32x3, Float32x2`, putting attribute 2 at byte 20, and all five use
+  `from_vertex_formats`. The hypothesis predicts the whole crate fails.
+- **Renders on macOS/Metal.** Metal requires only 4-byte attribute alignment.
+
+#### It is not #14710
+
+#14710 is a flicker/synchronisation bug. If this holds, **ticket 13's deciding
+argument was answering a different question entirely** — the wgpu 29 fix is real
+and irrelevant here, and 0.19-versus-0.18 would not be the axis at all. That
+sharpens [ticket 23](23-upstream-bevy-ui-android.md) Q1 rather than settling it.
+
+#### Held loosely, and why
+
+**No prior report matching this signature exists that I could find** — not in
+Bevy, wgpu or Imagination trackers. The hypothesis rests on the structural
+difference above, not on anyone else having hit it. The honest counter-argument:
+4-byte-aligned vertex attributes are extremely common, so a driver that
+mis-fetched them would break a great deal of software and someone would have
+noticed. What is *less* common is a `Float32x4` at a 4-byte-aligned offset with
+a stride that is not a multiple of 16 — the exact shape here. Only the device
+decides this; reading has taken it as far as it goes.
+[bevy#7944 "Corruption on some UI elements"](https://github.com/bevyengine/bevy/issues/7944)
+is the closest title in the tracker and was not chased.
+
+#### Corrected by ticket 23, which read the upstream sources
+
+[Ticket 23](23-upstream-bevy-ui-android.md) is resolved and moved two of the
+arguments above in opposite directions. Net: roughly even, and the hypothesis
+still stands.
+
+- **"The silence is the tell" is withdrawn**, struck above.
+- **"Differ in exactly one structural way" was overstated.** They differ in two:
+  `bevy_sprite_render` is `VertexStepMode::Instance` and builds positions from
+  `@builtin(vertex_index)`, so it **fetches no per-vertex attribute at all**.
+  Any bug confined to vertex-rate fetch produces the same sprite/UI split, and
+  this patch would not touch it. The prototype README already listed that as the
+  first fallback hypothesis; this comment claimed more than the evidence allows.
+- **Gained, and worth more than what was lost: prior art for the class, on the
+  exact silicon.** This comment recorded that none existed.
+  [godot#121005](https://github.com/godotengine/godot/issues/121005) (open,
+  2026-07-06) is Pixel 10 Pro XL, "PowerVR D-Series DXT-48-1536, OpenGL ES 3.2
+  build **25.1@6794074**": a legal but unusual vertex-attribute configuration is
+  **silently mis-fetched**, attributes "reading garbage", the **draw disappears
+  entirely**, "no GL errors, no warnings", other draws in the same frame fine,
+  not reproducible on desktop. Every structural row matches probe F. It
+  corroborates the *class*, not the alignment mechanism, and it is the GLES
+  driver rather than the Vulkan one.
+- **Sharpened: the layout is legal, so this needs a plain driver conformance
+  failure.** `VkVertexInputAttributeDescription` has four valid-usage statements
+  and none constrains offset alignment; the rule is
+  `VUID-vkCmdDraw-format-10390`, requiring only component-size alignment.
+  `wgpu-core` encodes exactly that — `attribute.format.size().min(4)`. That is a
+  higher bar than "Bevy is doing something dubious", and worth stating plainly.
+- **Adjacent:** Imagination's own PowerVR Graphics Recommendations say "on some
+  devices, padding each vertex to **16-byte boundaries** may also improve
+  performance" — about *stride*, doubly hedged, filed under performance. It
+  supports the 88 → 96 stride change as something Imagination think about; it
+  supports no correctness claim about attribute offsets.
+
+**And #14710 is definitively not this bug.** wgpu#8853 was a missing pipeline
+barrier between two render passes writing the same colour attachment. Every
+device in its thread is Mali or MediaTek/Exynos, the symptom is uniformly
+flicker, and it was **never closed**. A barrier bug decides whether the UI pass
+*lands*; it cannot scramble geometry within the pass.
+
+#### Two things to do differently on device, from ticket 23
+
+1. **Run the Godot control on `gl_compatibility` first.**
+   [godot#115171](https://github.com/godotengine/godot/issues/115171) (open) is
+   an Android/Vulkan-Mobile crash on **Pixel 10 Pro, ImgTech DXT-48-1536**, with
+   a backtrace through `vulkan.powervr.so (IMG_vkCreatePipelineCache+828)`, from
+   Play analytics on a shipping game. The probe's `project.godot` sets
+   `rendering_method.mobile="mobile"` — that exact path. `run.sh --renderer
+   gl_compatibility` already exists. Run both ways.
+2. **Bundle the validation layer, or raise the log filter to `debug`, before any
+   further argument rests on silence.** The harness has no diagnostic channel at
+   all right now, which is a worse position than "the bug is silent" implies.
+
+#### What is built
+
+[`prototypes/22-ui-vertex-alignment/`](../prototypes/22-ui-vertex-alignment/) —
+a vendored `bevy_ui_render` 0.19.1 whose `UiVertex` is reordered to put the
+three vec4s at bytes 0, 16 and 32, with the stride padded 88 → 96. **Shader
+locations are unchanged, so `ui.wgsl` is untouched**; only byte offsets move.
+Nothing about what is drawn changes, so if the corruption is anything other
+than alignment the patch changes nothing on screen — a clean negative.
+
+Verified at the desk: `cargo check` clean on desktop, `cargo ndk -t arm64-v8a
+check` clean, three passing tests (`cargo test -p bevy_ui_render ticket_22`)
+covering `offset_of!` agreement between the CPU struct and the declared GPU
+layout, the alignment property itself, and the upstream baseline. **A fresh APK
+is built and waiting** at `android/app/build/outputs/apk/debug/app-debug.apk`
+(3m32s Rust, 14s Gradle).
+
+`apply.sh` and `revert.sh` add and remove the one `[patch.crates-io]` stanza in
+the root `Cargo.toml`; both are idempotent and both were exercised.
+
+**Not verified: anything visual, on either platform.** No device, and
+`screencapture` on the dev machine lacks Screen Recording permission — it
+returns wallpaper with the menu bar and no windows — so even the macOS control
+could not be photographed. **Do the desktop control first** (`cargo run`, 15
+seconds): if the desktop is now corrupt the patch itself is wrong and the device
+tells you nothing.
+
+#### Reading the result, and what each outcome costs
+
+- **UI renders** → mechanism found, workaround in hand, upstream bug worth
+  reporting. Every probe this ticket inherited — B, C, D and A's remainder —
+  becomes readable in the same session. Budget for them.
+- **Still corrupt, desktop fine** → alignment eliminated, which is the leading
+  candidate gone for one minute of device time. Next hypotheses, in the order
+  the source suggests: (1) **per-vertex fetch itself** — the sprite pipeline is
+  `VertexStepMode::Instance` and builds positions from `@builtin(vertex_index)`,
+  so it never fetches a per-vertex attribute at all, and a bug confined to
+  `VertexStepMode::Vertex` would produce this same split; (2) **varying count** —
+  UI passes 7 locations against sprite's 2. Both separate cheaply with the
+  minimal repro that is move 4 on this ticket and that this session did not
+  build.
+- **Partially fixed** → the fault is in the glyph atlas path, and
+  `ui_texture_slice_pipeline` is next.
+
+The Godot control (move 1) is untouched and remains the right first cut if the
+phone session has time for both — it answers a different and broader question,
+and the two do not overlap.
+
+#### Working tree
+
+**Uncommitted, and on `main`.** `Cargo.toml` carries the experiment stanza and
+`Cargo.lock` moved with it; the prototype directory is untracked. Nothing here
+should reach `main` as-is — branch it, or run `revert.sh` before committing
+anything else.

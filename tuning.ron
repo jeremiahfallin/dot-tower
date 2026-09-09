@@ -1,0 +1,123 @@
+// dot-tower tuning. Hot-reloadable; never saved.
+//
+// The map's standing rule is that tuning constants live here and never in Rust,
+// because an idle game is 90% tuning. Ticket 12 adds the other half: nothing in
+// this file is ever written into a save, or hot reload breaks for every player
+// who already has one.
+//
+// Every field is optional — `crates/sim/src/tuning.rs` carries ticket 06's
+// first-pass curve as the default, so a sweep file need only name what it
+// changes. This file states the shipped values explicitly anyway, because the
+// numbers are the subject of an open ticket and a reader should not have to
+// open a Rust file to see them.
+//
+// Ticket 20 is RESOLVED and the lock curve below is its result. The
+// `composition` integers are still authoring — see the map's fog.
+(
+    // --- the tower ---
+    // 1.075 against gold's 1.095 is the engine: deeper floors are strictly more
+    // gold-efficient, which is what pulls the player upward. Past ~1.12 gold the
+    // economy runs away (ticket 06).
+    enemy_hp0: 36.0,
+    enemy_hp_base: 1.075,
+    enemy_dps0: 2.2,
+    enemy_dps_base: 1.075,
+    pack_size: 4,
+    gold_per_kill0: 3.0,
+    gold_base: 1.095,
+    // Ticket 03: this IS the farming mechanic. Without it there would be
+    // nothing below the wall to farm, so it sets the gold rate for the band.
+    respawn_timer: 20.0,
+
+    // --- climbers ---
+    rank_power_base: 1.15,
+    rank_cost_base: 1.30,
+    heal_scales_with_prestige: false,
+    types: (
+        melee:  (hp0: 70.0, dps0: 5.5, heal0: 0.0, cap: 40, rank_cost0: 25.0, threat: 3.0),
+        ranged: (hp0: 30.0, dps0: 9.0, heal0: 0.0, cap: 30, rank_cost0: 35.0, threat: 1.0),
+        healer: (hp0: 36.0, dps0: 0.0, heal0: 3.5, cap: 20, rank_cost0: 45.0, threat: 0.5),
+    ),
+    climb_speed: 0.5,
+
+    // --- healing ---
+    // Ticket 06: the aura fully out-healed the climb, so climbers reached the
+    // wall at 100% and the Wall was declared rather than emergent.
+    aura_floors: 1,
+    heal_policy: LowestFraction,
+    heal_self: true,
+    heal_hero: true,
+
+    // --- hero ---
+    // The slice ships the tank (ticket 16), but taunt stays off until the aura
+    // is real: ticket 16 found the wall is *safer* without it, because the
+    // crowd is armour, so taunt only pays on a hero tanky enough to hold it.
+    hero_hp0: 420.0,
+    hero_dps0: 38.0,
+    hero_power_base: 1.18,
+    hero_cost0: 120.0,
+    hero_cost_base: 1.30,
+    hero_respawn: 20.0,
+    hero_threat: 5.0,
+    hero_zone: 0,
+    // Aura multiplier is relic-only (ticket 16), so 1.0 is a fresh account.
+    hero_aura_mult: 1.0,
+    hero_aura_floors: 0,
+    hero_taunt: false,
+    hero_regen_pct: 0.0,
+
+    // --- the stream (ADR 0011) ---
+    // ONE interval against an authored ratio. `replacement` is the run-length
+    // dial and nothing else; the ratio is authored to read as an army rather
+    // than tuned to an optimum, and is never shown to the player.
+    replacement: 1.67,
+    composition: (melee: 4, ranged: 3, healer: 2),
+
+    // --- locking (ticket 20) ---
+    //
+    // `lock_cost_base` is NOT an independent constant. It is `gold_base ^ 10`
+    // = 1.095^10, so a lock costs a constant number of kills at its depth
+    // forever. Retuning `gold_base` without moving this in step reintroduces
+    // exactly the failure ticket 20 resolved; `Tuning::lock_outrun` is the
+    // number to check, and it must read 1.00.
+    //
+    //   above 1.00  the lock line falls permanently behind, climbers trail it by
+    //               tens of floors, and the per-type ceiling starts setting the
+    //               crowd size -- which ADR 0011 says it must never do
+    //   below 0.90  the lock is affordable the moment depth allows it, and
+    //               stops being a purchase at all
+    //
+    // `lock_cost0` is the crowd dial, and a nearly free one: across a 32x sweep
+    // the crowd went 6 -> 59 while peak floor moved 643 -> 616. At 1000 a lock
+    // costs ~147 kills at its depth, the crowd settles near 18 and trails the
+    // frontier by ~7 floors -- which fits ticket 10's 12-14 row tower column.
+    // This integer is authoring, not arithmetic; it is the one to move if the
+    // tower does not read as an army.
+    lock_cost0: 1000.0,
+    lock_cost_base: 2.4782276135,  // == 1.095^10, to ten places
+    // Deliberately NOT the crowd dial, though it can be made into one. Raising
+    // it to 40 also grows the crowd, but by gating the lock on depth rather than
+    // on gold: 91% of locks then arrive already affordable, and locking stops
+    // being a decision. Price the lock; do not delay it.
+    lock_margin: 15,
+
+    // --- prestige ---
+    // Compounds: a best-ever-peak multiplier dead-ends at floor ~220 (ticket 06).
+    prestige_divisor: 50.0,
+    prestige_exponent: 1.2,
+    prestige_mode: Compound,
+
+    // --- rules settled but not yet exercised ---
+    // Ticket 03's rule, which the throwaway model never ran. Tickets 14 and 19
+    // measured the omission as inside the noise (peak 147 -> 144). Left at the
+    // model's behaviour so ported numbers stay comparable; turning it on is how
+    // ticket 03 finally gets checked.
+    failed_floor_reset: false,
+    // Withdrawn by ticket 06: a sealed band measures zero, and its closed-form
+    // ceiling is 0.35% of the money. Locking is a spawn-point and travel-time
+    // mechanic, not an economic pillar.
+    sealed_income: false,
+
+    // --- instrumentation (ticket 14) ---
+    activation_radius: 2,
+)

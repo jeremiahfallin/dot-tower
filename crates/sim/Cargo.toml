@@ -1,0 +1,14 @@
+[package]
+name = "dot-tower-sim"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "The dot-tower simulation. Pure Rust, no Bevy, no rendering, no I/O beyond tuning."
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+ron = "0.11"
+
+[[bin]]
+name = "headless"
+path = "src/bin/headless.rs"

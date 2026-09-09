@@ -1,0 +1,50 @@
+ticket 20 — travel time and the lock curve
+6 runs x 60 min, wall-clock pinned, sealed_income OFF (ticket 06 withdrew it)
+all readings are run 6; crowd/transit/back are means over its last 20 minutes
+k = lock_cost_base / gold_base^10 = lock_cost_base / 2.478; k>1 means lock cost outruns income
+
+A. lock_cost_base — how lock cost grows against income (buy policy: cheapest)
+ cost_base      k    peak  crowd  transit   back  locks   goldwait   auto   walk    skips e/l    head   +10m
+     2.000   0.81     651      6       10      2     63       2.1s    89%    93%        344/0     24%     10
+     2.250   0.91     642      6       10      2     62       4.3s    68%    93%        332/0     24%     11
+     2.478   1.00     633      8       12      3     61      48.3s     0%    87%        372/0     24%     14
+     2.750   1.11     606     85       65     28     53      64.1s     0%    84%      397/230     25%      8
+     3.000   1.21     592     86      102     44     47      67.6s     0%    90%      426/325     26%     12
+     3.500   1.41     579     87      152     66     40      79.1s     0%    94%      433/436     26%     13
+     4.000   1.61     568     88      185     82     36      96.8s     0%    96%      433/499     26%     16
+     4.500   1.82     558     88      205     92     32      98.0s     0%    96%      433/466     27%     21
+
+B. the same curve, buy policy: lock-first — this is where 'automatic' is readable
+ cost_base      k    peak  crowd  transit   back  locks   goldwait   auto   walk    skips e/l    head   +10m
+     2.000   0.81     642      6       10      2     62       1.2s    90%    93%        333/0     24%     11
+     2.250   0.91     641      6       10      2     62       2.4s    74%    93%        339/0     24%     10
+     2.478   1.00     631      7       12      2     61      41.3s     0%    86%        351/0     24%     12
+     2.750   1.11     607     83       64     28     53      63.8s     0%    84%      407/239     25%     12
+     3.000   1.21     592     86      102     43     47      64.6s     0%    90%      412/353     26%     10
+     3.500   1.41     576     86      153     67     40      78.4s     0%    93%      432/429     26%     12
+     4.000   1.61     565     88      180     74     36      96.5s     0%    95%      433/501     26%     14
+     4.500   1.82     563     87      203     90     32      92.8s     0%    96%      433/478     26%     24
+
+C. lock_cost0 — the absolute price, at k = 1.00 (lock-first)
+     cost0      k    peak  crowd  transit   back  locks   goldwait   auto   walk    skips e/l    head   +10m
+       125   1.00     643      6       10      2     62       1.0s    65%    94%        335/0     24%     10
+       250   1.00     640      6       10      2     62      13.9s     2%    91%        334/0     24%     12
+       500   1.00     631      7       12      2     61      41.3s     0%    86%        351/0     24%     12
+      1000   1.00     634     18       16      7     60      53.1s     0%    83%        372/0     24%     14
+      2000   1.00     627     46       22     11     59      56.6s     0%    79%        378/0     25%     14
+      4000   1.00     616     59       29     15     57      54.1s     0%    79%        380/3     25%      5
+
+E. run length — is the climb still moving? floors gained in each 10-minute window
+ cost_base      k    peak                gain per 10 min, minutes 0-240
+     2.478   1.00     697   272 221  83  24  18  12  11   7   6   6   3   5   3   4   3   2   2   3   2   2   2   1   3   1
+     3.000   1.21     662   265 174  80  43  19  10  14  10   7   2   2   7   5   3   0   2   0   6   1   3   1   1   2   4
+     4.000   1.61     641   261 127  90  45  27  14  15   6   7   6   5   3   4   8   2   3   3   1   4   3   0   3   3   0
+
+D. lock_margin — how far the climb must clear a floor before sealing it
+    margin      k    peak  crowd  transit   back  locks   goldwait   auto   walk    skips e/l    head   +10m
+         0   1.00     632      8       12      3     61      54.4s     0%    87%        351/0     24%     14
+         5   1.00     632      8       12      3     61      54.3s     0%    87%        351/0     24%     14
+        10   1.00     629      7       12      2     61      53.2s     0%    88%        349/0     24%     13
+        15   1.00     631      7       12      2     61      41.3s     0%    86%        351/0     24%     12
+        25   1.00     633     21       16      7     60       6.2s    25%    84%        359/0     24%     13
+        40   1.00     624     58       27     14     58       0.5s    91%    78%        388/0     25%      4

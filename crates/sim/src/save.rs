@@ -187,33 +187,38 @@ impl Run {
     /// What prestige would destroy, named at its real value.
     ///
     /// Ticket 08 settled that the losses are itemised at their real values
-    /// (`melee rank 56 → 1`) rather than softened into minutes-to-recover, and
+    /// (`melee rank 56 -> 1`) rather than softened into minutes-to-recover, and
     /// shown **before committing, every time**. This is that list, and it lives
     /// next to the fields it enumerates so the two cannot drift apart.
+    ///
+    /// The separator is ASCII `->` rather than an arrow because this copy is
+    /// rendered verbatim on the prestige ledger, and the built-in font the game
+    /// still ships draws `→` as a missing-glyph box. Revisit when the pixel
+    /// font ADR 0016's art pass owes arrives.
     pub fn losses(&self) -> Vec<(&'static str, String)> {
         let fresh = Run::default();
         let mut out = vec![
-            ("gold", format!("{:.0} → 0", self.gold)),
-            ("floor reached", format!("{} → {}", self.peak, fresh.peak)),
-            ("locks", format!("{} → 0", self.lock_level)),
-            ("melee rank", format!("{} → {}", self.ranks.melee, fresh.ranks.melee)),
-            ("ranged rank", format!("{} → {}", self.ranks.ranged, fresh.ranks.ranged)),
-            ("healer rank", format!("{} → {}", self.ranks.healer, fresh.ranks.healer)),
+            ("gold", format!("{:.0} -> 0", self.gold)),
+            ("floor reached", format!("{} -> {}", self.peak, fresh.peak)),
+            ("locks", format!("{} -> 0", self.lock_level)),
+            ("melee rank", format!("{} -> {}", self.ranks.melee, fresh.ranks.melee)),
+            ("ranged rank", format!("{} -> {}", self.ranks.ranged, fresh.ranks.ranged)),
+            ("healer rank", format!("{} -> {}", self.ranks.healer, fresh.ranks.healer)),
         ];
         let fresh_hero = HeroProgress::default();
         for (hero, p) in &self.heroes {
             out.push((
                 "hero level",
                 format!(
-                    "{hero} level {} → {} ({:.0} experience → 0)",
+                    "{hero} level {} -> {} ({:.0} experience → 0)",
                     p.level, fresh_hero.level, p.experience
                 ),
             ));
         }
         if let Some((hero, floor)) = &self.stationed {
-            out.push(("stationed", format!("{hero} on floor {floor} → unstationed")));
+            out.push(("stationed", format!("{hero} on floor {floor} -> unstationed")));
         }
-        out.push(("best rate", format!("{:.0}/s → 0", self.best_rate)));
+        out.push(("best rate", format!("{:.0}/s -> 0", self.best_rate)));
         out
     }
 }

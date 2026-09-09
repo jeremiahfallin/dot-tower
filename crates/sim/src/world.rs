@@ -301,6 +301,22 @@ impl World {
     pub fn hero_alive(&self) -> bool {
         self.hero_dead_until.is_none_or(|until| self.t >= until)
     }
+    /// The hero's health as a fraction of its maximum, clamped to `0..=1`.
+    /// Ticket 09 draws this on the tower: the ring says *this second*, and the
+    /// strip's sparkline says *all minute*. Nothing else in the game shows a
+    /// unit's health — climbers deliberately have none (ADR 0016).
+    pub fn hero_health_fraction(&self) -> f64 {
+        let max = self.hero_max_hp();
+        if max <= 0.0 { 0.0 } else { (self.hero_hp / max).clamp(0.0, 1.0) }
+    }
+
+    /// Seconds until the hero is back on its post, or `None` while it is alive.
+    /// The whole cost of hero death is this downtime (ticket 05), so it is the
+    /// number the countdown that replaces the ring is counting.
+    pub fn hero_respawn_in(&self) -> Option<f64> {
+        self.hero_dead_until.filter(|until| *until > self.t).map(|until| until - self.t)
+    }
+
     pub fn climbers(&self) -> &[Climber] {
         &self.climbers
     }
@@ -454,6 +470,21 @@ impl World {
         self.floors.retain(|f, _| *f >= line);
         if self.hero_floor() < line {
             self.set_hero_floor(line);
+        }
+    }
+
+    /// Credits gold earned while the game was not ticking.
+    ///
+    /// The only path by which gold enters a run without a kill paying for it,
+    /// and it exists for exactly one caller: ticket 07's offline grant, which
+    /// is **computed rather than simulated** (ADR 0002) and so has no tick to
+    /// be credited from. Deliberately touches neither [`Totals::gold_earned`]
+    /// nor the rate ring — the grant is best rate times time away, so feeding
+    /// it back into the window it was measured from would compound a rate
+    /// against itself.
+    pub fn credit_offline(&mut self, gold: f64) {
+        if gold.is_finite() && gold > 0.0 {
+            self.run.gold += gold;
         }
     }
 

@@ -1,0 +1,16 @@
+[package]
+name = "dot-tower-save"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Reading and writing the dot-tower save, including every way it can go wrong."
+
+[dependencies]
+dot-tower-sim = { path = "../sim" }
+ron = "0.11"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+# Temp directories are hand-rolled in tests rather than pulled in as a
+# dependency: this crate's whole job is careful filesystem handling, so a test
+# harness that hides the filesystem would be testing the wrong thing.

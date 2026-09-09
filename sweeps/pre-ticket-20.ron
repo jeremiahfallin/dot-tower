@@ -1,0 +1,9 @@
+// The lock curve as it stood before ADR 0013 replaced it: geometric, growing
+// x4.00 per ten floors against per-kill gold's x2.478. Kept so the failure it
+// produced stays reproducible -- the lock line falls permanently behind the
+// wall, climbers trail it by ~82 floors, and the per-type ceiling ends up
+// setting the crowd size in violation of ADR 0011.
+//
+// `lock_free_below_best` is off because it did not exist then; leaving it on
+// would make this reproduce nothing in particular.
+(prestige_basis: Peak, lock_pricing: Geometric, lock_free_below_best: false, lock_cost0: 500.0, lock_cost_base: 4.0)

@@ -205,3 +205,54 @@ wall-clock reconciliation for zero player-facing gain. The discontinuity remains
 ticket 05 established individual climbers are never tracked.
 
 Status: resolved
+
+## Comments
+
+### Built (session of 2026-09-09)
+
+Implemented as specified. Types in [`crates/sim/src/save.rs`](../../../crates/sim/src/save.rs),
+persistence in [`crates/save/`](../../../crates/save) — split so the simulation stays free of I/O,
+and because the Android path comes from `bevy_android::ANDROID_APP` and pulling that into the save
+layer would put Bevy underneath it. The directory is a parameter; the game resolves it and passes
+it in. Eleven tests, one per failure path.
+
+**The `Account`/`Run` partition earns its keep immediately, and only because `World` was moved onto
+it.** Holding the two structs *as the world's own state* rather than building them at write time is
+what makes prestige `run = Run::default()` in fact and not just on paper — a world that kept its own
+`gold` and `peak` beside the save's would be the drift this ticket was written against. `campaign()`
+in the sim now prestiges through `SaveGame::prestige` rather than threading an `f64`, and reproduces
+the reference model's peaks exactly, so the save type is on the path every measurement already
+takes.
+
+The ledger-cannot-drift claim needed a guard to be true. Without a derive macro it is a promise, so
+there is a test that serialises `Run`, counts its top-level fields, and fails if the count moves —
+whoever adds a field is made to visit `Run::losses` and decide what the player is told.
+
+**One case was missing from the decision tree and has been added: a primary that is gone while the
+backup survives.** The ticket branches on `NotFound` → new game, which is right for a first launch
+and wrong here — something deleted the save, and starting a silent new game on top of a live backup
+is the exact failure the rest of this ticket is against. First launch is still silent, because a
+first launch has neither file. Recorded here rather than quietly, since it extends a resolved
+decision.
+
+**Two things this ticket named turned out not to exist yet, and now do.**
+
+- **Best rate.** Ticket 07 specified it and this ticket put it in the save, but nothing had ever
+  computed it. It is a high-water mark, so it cannot be recovered from a coarser record after the
+  fact — it is accumulated exactly, per tick, over a 600-tick ring. `offline_cap_hours` joins the
+  tuning file, and `SaveGame::offline_grant` is ticket 07's formula with elapsed clamped to
+  `0..=cap` so a backwards clock pays nothing rather than negative.
+- **Hero experience.** The field list says "per-hero level and experience", and experience now
+  accrues from kills inside the aura — which the simulation was already counting for ticket 16 and
+  discarding. **Nothing turns it into a level**: `hero_cost` is still the throwaway model's
+  gold-bought hero, and the experience-to-level curve is ticket 16's and is specified nowhere, so
+  inventing one here would have been tuning by accident. The save carries both fields, as this
+  ticket says it should, and the seam is ready for the curve when it lands.
+
+`settings.ron` has the mechanism and no fields — the policy (own file, resets on any failure, no
+migration chain, untouched by the rotation) is the part this ticket settled, and what goes in it
+still waits on the UI.
+
+Not built here: the four triggers themselves, which are Bevy-side and belong with the game loop
+rather than with a probe harness. `Trigger` names them so the call sites will be self-describing,
+and the write lock is enforced against all four.

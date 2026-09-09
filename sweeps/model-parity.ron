@@ -1,0 +1,16 @@
+// Reproduces the throwaway JS model at
+// `.scratch/dot-tower/prototypes/06-progression-curve/model.mjs` exactly —
+// tick for tick, over 1,974 samples, on both lock curves.
+//
+// The only thing it changes is `sealed_income`, and that is the point. The
+// model still pays frozen income from sealed floors; ticket 06 WITHDREW that
+// mechanic from the design after measuring a sealed band at 0.04% of the money.
+// So the model and the design disagree, and every number the model produced
+// includes an income source the game will not have.
+//
+// On the shipped lock curve that is worth ~0.2% of peak floor and ticket 06's
+// finding stands. On ticket 20's proposed curve it is worth 59%. See the
+// comment appended to ticket 20.
+//
+// Use this file to check the port. Never to tune.
+(prestige_basis: Peak, lock_pricing: Geometric, lock_free_below_best: false, sealed_income: true, lock_cost0: 500.0, lock_cost_base: 4.0)

@@ -169,3 +169,36 @@ Flag-gated in `06-progression-curve/model.mjs`, defaults byte-identical — veri
 `lockFreeBelowBest: false` (default), `sealedIncome: true` (default — withdrawal is opt-in so
 every prior ticket's reproduction stays exact). Probes must pass `bestEverFloor` explicitly;
 the free band only exists relative to an account history.
+
+## Comments
+
+### A second implementation reproduces this ticket (session of 2026-09-09)
+
+[`crates/sim/`](../../../crates/sim) is the model reimplemented in Rust as the shipping
+simulation, and ADR 0013 is now implemented in it. Cross-checked against `model.mjs` in three
+configurations, six runs of 60 minutes pinned, run-6 peak:
+
+| | reference model | `crates/sim` |
+|---|---|---|
+| geometric 4.0, sealed income on | 569 | 569 |
+| geometric 4.0, sealed income off | 568 | 568 |
+| time K=30, free below best, sealed off | 620 | 614 |
+
+The geometric path is identical tick for tick over 1,974 samples; the time path agrees to within
+1%. **Nothing in this ticket needs revisiting** — the decision reproduces independently.
+
+**One correction to an earlier draft of this comment**, which claimed the two implementations
+disagreed at depth. They do not. The apparent disagreement was a difference in *method*: this
+ticket's Q2 and Q4 figures come from runs ending at the stall, where a mature run lasts 100–180
+minutes, and they were being compared against 60-minute pinned runs. A 60-minute pin truncates
+run 6 to about a third of its natural length, which catches the stream still in its early
+pile-up rather than at the steady state ADR 0011 is about. Given room to settle — six runs of
+180 minutes — `crates/sim` reproduces this ticket's picture: run 6 crowd 5, walk 2, **zero cap
+skips**, against the reference model's crowd 6 and walk 10.2 to stall.
+
+The lesson generalises past this ticket. Ticket 19 established that the stall heuristic cannot be
+compared *across variants*, and the harness therefore pins wall clock by default. But pinning is
+not free either: pinned to a length shorter than a mature run's natural one, it reports the
+stream's transient and calls it depth. **The two methods answer different questions** — pin to
+compare curves, run to stall to characterise one — and a reading is only meaningful with its
+method attached. Worth knowing before the next ticket takes a number from either.

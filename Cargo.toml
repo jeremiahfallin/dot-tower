@@ -1,3 +1,6 @@
+[workspace]
+members = ["crates/sim", "crates/save"]
+
 [package]
 name = "dot-tower"
 version = "0.1.0"
@@ -16,6 +19,11 @@ name = "dot-tower"
 path = "src/main.rs"
 
 [dependencies]
+# The simulation. Pure Rust and deliberately Bevy-free: ticket 22 leaves the UI
+# layer in question, and a crate boundary is what keeps that risk off the sim.
+dot-tower-sim = { path = "crates/sim" }
+dot-tower-save = { path = "crates/save" }
+
 # Pinned to 0.19.1, not "0.19": 0.19.0 shipped a P-Regression sprite flicker
 # (#25163) in a config near-identical to ours. See .scratch/dot-tower/issues/13.
 #

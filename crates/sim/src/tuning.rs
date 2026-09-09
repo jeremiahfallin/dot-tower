@@ -165,6 +165,15 @@ pub struct Tuning {
     /// Only buy the lock at floor 10k once peak floor is this far above it.
     pub lock_margin: u32,
 
+    /// How long the game keeps paying after it is closed, in hours.
+    ///
+    /// Ticket 07 fixed this at 12 hours at **100%** of best rate, and the reason
+    /// it is not a decay curve is measured: gold converts to floors
+    /// logarithmically, so 96x the away time buys ~3x the floors. That deletes
+    /// the efficiency factor and the decay curve rather than tuning them, and
+    /// leaves the cap as an expectation-setting device rather than a balance one.
+    pub offline_cap_hours: f64,
+
     // --- prestige ---
     pub prestige_divisor: f64,
     pub prestige_exponent: f64,
@@ -250,6 +259,8 @@ impl Default for Tuning {
             lock_cost0: 1000.0,
             lock_cost_base: 1.095_f64.powf(10.0),
             lock_margin: 15,
+
+            offline_cap_hours: 12.0,
 
             prestige_divisor: 50.0,
             prestige_exponent: 1.2,
@@ -374,6 +385,7 @@ impl Tuning {
         // A replacement of zero spawns a climber every tick forever.
         positive("replacement", self.replacement);
         positive("prestige_divisor", self.prestige_divisor);
+        positive("offline_cap_hours", self.offline_cap_hours);
 
         if self.pack_size == 0 {
             bad.push("pack_size must be >= 1".into());

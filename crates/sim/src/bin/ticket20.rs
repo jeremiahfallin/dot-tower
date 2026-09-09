@@ -9,7 +9,7 @@
 
 use dot_tower_sim::autoplay::{BuyPolicy, Greedy, Station};
 use dot_tower_sim::curves::head_start_floors;
-use dot_tower_sim::{campaign, Outcome, Player, Tuning};
+use dot_tower_sim::{campaign, play, Outcome, Player, Tuning, World};
 
 const HOUR: f64 = 3600.0;
 const RUNS: usize = 6;
@@ -156,7 +156,8 @@ fn main() {
             Box::new(Greedy::new(BuyPolicy::LockFirst, Station::Frontier)) as Box<dyn Player>
         });
         let m = mature.last().unwrap().prestige_mult_in * mature.last().unwrap().prestige_mult_earned;
-        let long = dot_tower_sim::Run::new(t.clone(), m).play(
+        let long = play(
+            World::new(t.clone(), m),
             &mut Greedy::new(BuyPolicy::LockFirst, Station::Frontier),
             4.0 * HOUR,
         );

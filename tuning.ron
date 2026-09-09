@@ -101,6 +101,12 @@
     // being a decision. Price the lock; do not delay it.
     lock_margin: 15,
 
+    // --- offline (ticket 07) ---
+    // 12 hours at 100% of best rate. Not a decay curve, and deliberately not:
+    // gold converts to floors logarithmically, so 96x the away time buys ~3x
+    // the floors. The cap is an expectation-setting device, not a balance one.
+    offline_cap_hours: 12.0,
+
     // --- prestige ---
     // Compounds: a best-ever-peak multiplier dead-ends at floor ~220 (ticket 06).
     prestige_divisor: 50.0,

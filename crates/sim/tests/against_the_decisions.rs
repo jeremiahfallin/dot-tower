@@ -177,7 +177,7 @@ fn no_spending_strategy_pulls_away_from_the_others() {
     let t = Tuning::default();
     let run = |buy: BuyPolicy| {
         let mut p = Greedy::new(buy, Station::Frontier);
-        dot_tower_sim::Run::new(t.clone(), 1.0).play(&mut p, HOUR).peak as f64
+        dot_tower_sim::play(dot_tower_sim::World::new(t.clone(), 1.0), &mut p, HOUR).peak as f64
     };
     let results = [
         run(BuyPolicy::Cheapest),

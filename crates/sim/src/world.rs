@@ -33,6 +33,7 @@
 use crate::curves::*;
 use crate::geometry::{Floor, FloorPos};
 use crate::metrics::{LockEvent, Sample, Totals};
+use crate::save::{Account, HeroProgress, Run, SLICE_HERO};
 use crate::tuning::{HealPolicy, Tuning};
 use crate::types::{ClimberType, PerType};
 use std::collections::{HashMap, HashSet};
@@ -135,18 +136,17 @@ pub struct World {
     // --- the clock ---
     t: f64,
 
-    // --- Run state: everything prestige clears (ticket 12) ---
-    gold: f64,
-    lock_level: u32,
-    ranks: PerType<u32>,
-    peak: Floor,
-    /// Prestige multiplies climber and hero health and damage. It is the only
-    /// source of permanent raw power.
-    prestige_mult: f64,
+    /// Everything prestige clears, and the thing the save writes.
+    ///
+    /// Held as the struct rather than as loose fields deliberately: ticket 12
+    /// made prestige `run = Run::default()`, and that only holds if the world's
+    /// idea of a run and the save's are the same declaration. A cached copy of
+    /// any field here would be the drift that ticket was written against.
+    run: Run,
+    /// Everything that outlives a prestige.
+    account: Account,
 
-    // --- the hero ---
-    hero_level: u32,
-    hero_floor: Floor,
+    // --- the hero's live state, which is never saved ---
     hero_hp: f64,
     /// `Some(t)` while dead. Uptime is the hero's whole contribution (ticket 16).
     hero_dead_until: Option<f64>,
@@ -162,6 +162,16 @@ pub struct World {
     /// Rolling `(t, floor, gold)`. Only maintained when `sealed_income` is on;
     /// it exists solely to measure a band at lock time.
     band_window: Vec<(f64, Floor, f64)>,
+
+    /// Gold credited in each of the last 600 ticks, as a ring buffer, with its
+    /// running sum. Ticket 07's best rate is the high-water mark of the rolling
+    /// 60-second average, and a high-water mark cannot be recovered from a
+    /// coarser record after the fact — so it is accumulated exactly, per tick,
+    /// rather than sampled.
+    gold_ring: Box<[f64; RATE_WINDOW_TICKS]>,
+    gold_ring_at: usize,
+    gold_ring_sum: f64,
+    gold_this_tick: f64,
 
     // --- instrumentation ---
     totals: Totals,
@@ -184,6 +194,9 @@ pub struct World {
 
 const WINDOW: f64 = 60.0;
 
+/// Ticket 07's rolling window, in ticks.
+const RATE_WINDOW_TICKS: usize = (WINDOW / DT) as usize;
+
 impl World {
     /// A fresh run. `prestige_mult` is the account's cumulative multiplier —
     /// `1.0` for a brand-new account.
@@ -192,13 +205,15 @@ impl World {
         Self {
             tuning,
             t: 0.0,
-            gold: 0.0,
-            lock_level: 0,
-            ranks: PerType::splat(1),
-            peak: 1,
-            prestige_mult,
-            hero_level: 1,
-            hero_floor: 1,
+            run: Run {
+                // The slice's one hero exists from the first frame, stationed
+                // at the bottom of the tower.
+                heroes: std::iter::once((SLICE_HERO.to_string(), HeroProgress::default()))
+                    .collect(),
+                stationed: Some((SLICE_HERO.to_string(), 1)),
+                ..Run::default()
+            },
+            account: Account { cumulative_prestige_mult: prestige_mult, ..Account::default() },
             hero_hp,
             hero_dead_until: None,
             climbers: Vec::new(),
@@ -207,6 +222,10 @@ impl World {
             last_decision: 0.0,
             sealed_rate: 0.0,
             band_window: Vec::new(),
+            gold_ring: Box::new([0.0; RATE_WINDOW_TICKS]),
+            gold_ring_at: 0,
+            gold_ring_sum: 0.0,
+            gold_this_tick: 0.0,
             totals: Totals::default(),
             locks: Vec::new(),
             margin_eligible_since: None,
@@ -223,6 +242,27 @@ impl World {
         }
     }
 
+    /// Rebuilds a world from a save.
+    ///
+    /// The active band is not restored, because it is not in the save: the
+    /// stream respawns at the lock line and re-walks, and ticket 07 already
+    /// ruled that re-transit part of what offline gold pays for. The hero comes
+    /// back **alive, on its stationed floor, with every ability ready** — which
+    /// is technically exploitable by relaunching, and does not matter, because
+    /// there are no leaderboards and relaunching to save one cooldown is more
+    /// tedious than waiting.
+    pub fn resume(tuning: Tuning, account: Account, run: Run) -> Self {
+        let mut w = Self::new(tuning, account.cumulative_prestige_mult);
+        w.run = run;
+        w.account = account;
+        if w.run.stationed.is_none() {
+            w.set_hero_floor(w.lock_line().max(1));
+        }
+        w.hero_hp = w.hero_max_hp();
+        w.hero_dead_until = None;
+        w
+    }
+
     // ----------------------------------------------------------------- reads
 
     pub fn tuning(&self) -> &Tuning {
@@ -232,19 +272,31 @@ impl World {
         self.t
     }
     pub fn gold(&self) -> f64 {
-        self.gold
+        self.run.gold
     }
     pub fn peak(&self) -> Floor {
-        self.peak
+        self.run.peak
     }
     pub fn ranks(&self) -> PerType<u32> {
-        self.ranks
+        self.run.ranks
     }
     pub fn hero_level(&self) -> u32 {
-        self.hero_level
+        self.hero().level
+    }
+
+    fn hero(&self) -> HeroProgress {
+        self.run.heroes.get(SLICE_HERO).copied().unwrap_or_default()
+    }
+
+    /// Read-only view of what the save would write.
+    pub fn run(&self) -> &Run {
+        &self.run
+    }
+    pub fn account(&self) -> &Account {
+        &self.account
     }
     pub fn hero_floor(&self) -> Floor {
-        self.hero_floor
+        self.run.stationed.as_ref().map_or(1, |(_, f)| *f)
     }
     pub fn hero_alive(&self) -> bool {
         self.hero_dead_until.is_none_or(|until| self.t >= until)
@@ -256,10 +308,14 @@ impl World {
         &self.floors
     }
     pub fn lock_level(&self) -> u32 {
-        self.lock_level
+        self.run.lock_level
     }
     pub fn totals(&self) -> &Totals {
         &self.totals
+    }
+    /// Ticket 07's best rate — the highest sustained gold/sec this run.
+    pub fn best_rate(&self) -> f64 {
+        self.run.best_rate
     }
     /// Every lock bought this run, in order.
     pub fn locks(&self) -> &[LockEvent] {
@@ -272,12 +328,12 @@ impl World {
     /// The highest locked floor. Climbers spawn here and nothing below it is
     /// rendered or simulated.
     pub fn lock_line(&self) -> Floor {
-        10 * self.lock_level + if self.lock_level > 0 { 1 } else { 0 }
+        10 * self.run.lock_level + if self.run.lock_level > 0 { 1 } else { 0 }
     }
 
     /// The floor the next lock would seal, and what it costs.
     pub fn next_lock(&self) -> (Floor, f64) {
-        (10 * (self.lock_level + 1), lock_cost(&self.tuning, self.lock_level + 1))
+        (10 * (self.run.lock_level + 1), lock_cost(&self.tuning, self.run.lock_level + 1))
     }
 
     /// Where the column piles up: the highest floor holding live climbers.
@@ -298,24 +354,24 @@ impl World {
 
     /// Buys the next rank of `ty` if it is affordable. Returns whether it was.
     pub fn buy_rank(&mut self, ty: ClimberType) -> bool {
-        let cost = rank_cost(&self.tuning, ty, self.ranks[ty]);
-        if cost > self.gold {
+        let cost = rank_cost(&self.tuning, ty, self.run.ranks[ty]);
+        if cost > self.run.gold {
             return false;
         }
-        self.gold -= cost;
-        self.ranks[ty] += 1;
+        self.run.gold -= cost;
+        self.run.ranks[ty] += 1;
         true
     }
 
     /// See [`hero_cost`] on why this is the throwaway model's hero and not the
     /// shipping one.
     pub fn buy_hero_level(&mut self) -> bool {
-        let cost = hero_cost(&self.tuning, self.hero_level);
-        if cost > self.gold {
+        let cost = hero_cost(&self.tuning, self.hero_level());
+        if cost > self.run.gold {
             return false;
         }
-        self.gold -= cost;
-        self.hero_level += 1;
+        self.run.gold -= cost;
+        self.run.heroes.entry(SLICE_HERO.to_string()).or_default().level += 1;
         true
     }
 
@@ -323,10 +379,10 @@ impl World {
     /// not yet cleared it by [`Tuning::lock_margin`].
     pub fn buy_lock(&mut self) -> bool {
         let (floor, cost) = self.next_lock();
-        if self.peak < floor + self.tuning.lock_margin || cost > self.gold {
+        if self.run.peak < floor + self.tuning.lock_margin || cost > self.run.gold {
             return false;
         }
-        self.gold -= cost;
+        self.run.gold -= cost;
         self.do_lock(floor);
         true
     }
@@ -335,7 +391,7 @@ impl World {
         self.locks.push(LockEvent {
             t: self.t,
             floor: new_line,
-            cost: lock_cost(&self.tuning, self.lock_level + 1),
+            cost: lock_cost(&self.tuning, self.run.lock_level + 1),
             gold_wait: self.margin_eligible_since.map_or(0.0, |since| self.t - since),
         });
         self.margin_eligible_since = None;
@@ -354,7 +410,7 @@ impl World {
             self.sealed_rate += sum / WINDOW;
         }
 
-        self.lock_level = new_line / 10;
+        self.run.lock_level = new_line / 10;
         let line = self.lock_line();
 
         // Trailing climbers sprint to the new entry floor (ticket 03). Nothing
@@ -366,8 +422,8 @@ impl World {
             }
         }
         self.floors.retain(|f, _| *f >= line);
-        if self.hero_floor < line {
-            self.hero_floor = line;
+        if self.hero_floor() < line {
+            self.set_hero_floor(line);
         }
     }
 
@@ -376,29 +432,34 @@ impl World {
     /// downtime that *is* the throttle.
     pub fn station_hero(&mut self, floor: Floor) {
         if self.hero_alive() {
-            self.hero_floor = floor.max(self.lock_line());
+            let line = self.lock_line();
+            self.set_hero_floor(floor.max(line));
         }
     }
 
     // ------------------------------------------------------------------ tick
 
+    fn set_hero_floor(&mut self, floor: Floor) {
+        self.run.stationed = Some((SLICE_HERO.to_string(), floor));
+    }
+
     fn hero_max_hp(&self) -> f64 {
-        self.tuning.hero_hp0 * self.tuning.hero_power_base.powf(self.hero_level as f64 - 1.0)
-            * self.prestige_mult
+        self.tuning.hero_hp0 * self.tuning.hero_power_base.powf(self.hero_level() as f64 - 1.0)
+            * self.account.cumulative_prestige_mult
     }
 
     fn climber_hp(&self, ty: ClimberType, rank: u32) -> f64 {
         self.tuning.types.get(ty).hp0 * self.tuning.rank_power_base.powf(rank as f64 - 1.0)
-            * self.prestige_mult
+            * self.account.cumulative_prestige_mult
     }
 
     fn climber_dps(&self, ty: ClimberType, rank: u32) -> f64 {
         self.tuning.types.get(ty).dps0 * self.tuning.rank_power_base.powf(rank as f64 - 1.0)
-            * self.prestige_mult
+            * self.account.cumulative_prestige_mult
     }
 
     fn climber_heal(&self, ty: ClimberType, rank: u32) -> f64 {
-        let m = if self.tuning.heal_scales_with_prestige { self.prestige_mult } else { 1.0 };
+        let m = if self.tuning.heal_scales_with_prestige { self.account.cumulative_prestige_mult } else { 1.0 };
         self.tuning.types.get(ty).heal0 * self.tuning.rank_power_base.powf(rank as f64 - 1.0) * m
     }
 
@@ -412,8 +473,9 @@ impl World {
     }
 
     fn credit(&mut self, f: Floor, g: f64) {
-        self.gold += g;
+        self.run.gold += g;
         self.totals.gold_earned += g;
+        self.gold_this_tick += g;
         if self.tuning.sealed_income {
             self.band_window.push((self.t, f, g));
             if self.band_window.len() > 20_000 {
@@ -447,7 +509,7 @@ impl World {
         // settled this tick's peak and before the player may spend.
         if self.margin_eligible_since.is_none() {
             let (floor, _) = self.next_lock();
-            if self.peak >= floor + self.tuning.lock_margin {
+            if self.run.peak >= floor + self.tuning.lock_margin {
                 self.margin_eligible_since = Some(self.t);
             }
         }
@@ -465,7 +527,33 @@ impl World {
         }
 
         self.account_for_churn();
+        self.record_best_rate();
         self.t += DT;
+    }
+
+    /// Ticket 07. The rate offline gold pays at: a **high-water mark**, not a
+    /// recent average, so it cannot be sampled at an unrepresentative moment —
+    /// a player who quits at the wall leaves a system whose steady state is
+    /// gold-without-progress, and that is what they are owed for.
+    ///
+    /// Before a full window has elapsed the divisor is the elapsed time rather
+    /// than 60, or the opening seconds of a run would report a rate diluted by
+    /// time that never happened.
+    fn record_best_rate(&mut self) {
+        self.gold_ring_sum -= self.gold_ring[self.gold_ring_at];
+        self.gold_ring[self.gold_ring_at] = self.gold_this_tick;
+        self.gold_ring_sum += self.gold_this_tick;
+        self.gold_ring_at = (self.gold_ring_at + 1) % RATE_WINDOW_TICKS;
+        self.gold_this_tick = 0.0;
+
+        let span = (self.t + DT).min(WINDOW);
+        if span <= 0.0 {
+            return;
+        }
+        let rate = self.gold_ring_sum / span;
+        if rate > self.run.best_rate {
+            self.run.best_rate = rate;
+        }
     }
 
     /// Ticket 15 / ADR 0011. One interval for the whole stream, against an
@@ -486,7 +574,7 @@ impl World {
             self.cap_skips += 1;
             return;
         }
-        let hp = self.climber_hp(ty, self.ranks[ty]);
+        let hp = self.climber_hp(ty, self.run.ranks[ty]);
         self.climbers.push(Climber { ty, pos: FloorPos::entering(self.lock_line()), hp, max_hp: hp });
     }
 
@@ -537,16 +625,16 @@ impl World {
     /// transit them free.
     fn hero_target(&self) -> Floor {
         if !self.hero_alive() || self.tuning.hero_zone == 0 {
-            return self.hero_floor;
+            return self.hero_floor();
         }
-        let lo = self.hero_floor.saturating_sub(self.tuning.hero_zone).max(self.lock_line());
-        let hi = (self.hero_floor + self.tuning.hero_zone).min(self.peak);
+        let lo = self.hero_floor().saturating_sub(self.tuning.hero_zone).max(self.lock_line());
+        let hi = (self.hero_floor() + self.tuning.hero_zone).min(self.run.peak);
         for f in lo..=hi {
             if self.floors.get(&f).is_none_or(|s| s.count > 0) {
                 return f;
             }
         }
-        self.hero_floor
+        self.hero_floor()
     }
 
     fn fight(&mut self, hero_target: Floor, hero_alive: bool) {
@@ -605,7 +693,7 @@ impl World {
         // (ADR 0005). It is keyed on where the climber *stands*.
         let aura_on = hero_alive && self.tuning.hero_aura_mult > 1.0;
         let in_aura = |fl: Floor| {
-            aura_on && fl.abs_diff(self.hero_floor) <= self.tuning.hero_aura_floors
+            aura_on && fl.abs_diff(self.hero_floor()) <= self.tuning.hero_aura_floors
         };
 
         let mut dps = 0.0;
@@ -613,7 +701,7 @@ impl World {
         for &i in &standing {
             let cl = &self.climbers[i];
             let m = if in_aura(cl.pos.floor) { self.tuning.hero_aura_mult } else { 1.0 };
-            let d = self.climber_dps(cl.ty, self.ranks[cl.ty]) * m;
+            let d = self.climber_dps(cl.ty, self.run.ranks[cl.ty]) * m;
             dps += d;
             gold_weighted += d * m;
         }
@@ -621,9 +709,9 @@ impl World {
             // The hero's own damage is deliberately not where its value lies,
             // and it does not multiply itself — but the gold it earns is
             // weighted like everyone else's.
-            let m = if in_aura(self.hero_floor) { self.tuning.hero_aura_mult } else { 1.0 };
-            let d = self.tuning.hero_dps0 * self.tuning.hero_power_base.powf(self.hero_level as f64 - 1.0)
-                * self.prestige_mult;
+            let m = if in_aura(self.hero_floor()) { self.tuning.hero_aura_mult } else { 1.0 };
+            let d = self.tuning.hero_dps0 * self.tuning.hero_power_base.powf(self.hero_level() as f64 - 1.0)
+                * self.account.cumulative_prestige_mult;
             dps += d;
             gold_weighted += d * m;
         }
@@ -650,9 +738,18 @@ impl World {
             let g = killed as f64 * gold_per_kill(&self.tuning, f) * gold_mult;
             self.credit(f, g);
             // Experience comes only from kills inside the aura, so it reflects
-            // where the hero has actually fought (ticket 16).
-            if hero_alive && f.abs_diff(self.hero_floor) <= self.tuning.hero_aura_floors {
+            // where the hero has actually fought — enemies killed elsewhere in
+            // the tower grant none (ticket 16). This is also why the hero's two
+            // economies never touch: experience is never bought.
+            if hero_alive && f.abs_diff(self.hero_floor()) <= self.tuning.hero_aura_floors {
                 self.totals.kills_in_aura += killed as u64;
+                // NOTE: experience accrues, but nothing yet turns it into a
+                // level — `hero_cost` is still the throwaway model's gold-bought
+                // hero. The experience-to-level curve is ticket 16's and is not
+                // specified anywhere, so inventing one here would be tuning by
+                // accident. The field is real so the save carries it.
+                self.run.heroes.entry(SLICE_HERO.to_string()).or_default().experience +=
+                    killed as f64;
             }
         }
 
@@ -716,7 +813,7 @@ impl World {
     }
 
     fn heal(&mut self, hero_alive: bool) {
-        let heal_rate = self.climber_heal(ClimberType::Healer, self.ranks.healer) * DT;
+        let heal_rate = self.climber_heal(ClimberType::Healer, self.run.ranks.healer) * DT;
         if heal_rate <= 0.0 {
             return;
         }
@@ -740,7 +837,7 @@ impl World {
             // The hero is a valid target with no special-casing.
             units.push(HealUnit {
                 target: HealTarget::Hero,
-                floor: self.hero_floor,
+                floor: self.hero_floor(),
                 hp: self.hero_hp,
                 max_hp: hero_max,
             });
@@ -871,9 +968,9 @@ impl World {
             }
             self.totals.ticks_walking += 1;
             if let Some(entered) = self.climbers[i].pos.walk(speed)
-                && entered > self.peak
+                && entered > self.run.peak
             {
-                self.peak = entered;
+                self.run.peak = entered;
                 self.last_peak_gain_at = self.t;
             }
         }
@@ -881,9 +978,10 @@ impl World {
 
     fn pay_sealed_income(&mut self) {
         if self.sealed_rate > 0.0 {
-            let g = self.sealed_rate * self.prestige_mult * DT;
-            self.gold += g;
+            let g = self.sealed_rate * self.account.cumulative_prestige_mult * DT;
+            self.run.gold += g;
             self.totals.gold_earned += g;
+            self.gold_this_tick += g;
         }
     }
 
@@ -918,7 +1016,7 @@ impl World {
             add(cl.pos.floor, &mut act);
         }
         if self.hero_alive() {
-            add(self.hero_floor, &mut act);
+            add(self.hero_floor(), &mut act);
         }
         act
     }
@@ -953,13 +1051,13 @@ impl World {
             .sum()
     }
     pub(crate) fn prestige_mult(&self) -> f64 {
-        self.prestige_mult
+        self.account.cumulative_prestige_mult
     }
     /// The account's cumulative multiplier coming into this run. Never shown to
     /// a player — ADR 0007 makes head start in floors the only form it takes on
     /// screen — but the harness needs it to label a campaign.
     pub fn prestige_mult_pub(&self) -> f64 {
-        self.prestige_mult
+        self.account.cumulative_prestige_mult
     }
     pub(crate) fn sealed_rate(&self) -> f64 {
         self.sealed_rate

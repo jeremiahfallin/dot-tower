@@ -6,11 +6,11 @@
 //! ticket 19 caught inverting a result.
 
 use dot_tower_sim::autoplay::Greedy;
-use dot_tower_sim::{Run, Tuning};
+use dot_tower_sim::{play, Tuning, World};
 
 fn main() {
     let minutes: f64 = std::env::args().nth(1).and_then(|s| s.parse().ok()).unwrap_or(60.0);
-    let o = Run::new(Tuning::default(), 1.0).play(&mut Greedy::default(), minutes * 60.0);
+    let o = play(World::new(Tuning::default(), 1.0), &mut Greedy::default(), minutes * 60.0);
     let s = o.samples.last().expect("a run this long samples");
 
     println!("{{");

@@ -27,27 +27,74 @@ pub mod autoplay;
 pub mod curves;
 pub mod geometry;
 pub mod metrics;
+pub mod save;
 pub mod tuning;
 pub mod types;
 pub mod world;
 
 pub use geometry::{Floor, FloorPos, NormX};
 pub use metrics::{LockEvent, Sample, Totals};
+pub use save::{Account, Ledger, Run, SaveGame};
 pub use tuning::Tuning;
 pub use types::{ClimberType, PerType};
 pub use world::{Climber, Player, World, DT};
 
-use curves::{compound_prestige, prestige_mult_for};
+use curves::prestige_mult_for;
 
-/// A run played to a fixed wall-clock length, with samples taken along the way.
+/// Plays a world for `seconds` of simulated time, sampling every 10s.
+///
+/// A free function rather than a type: `CONTEXT.md` gives **run** a specific
+/// meaning — the span of play between two prestiges — and that noun belongs to
+/// [`Run`], the thing prestige resets. A second type competing for it was worth
+/// no more than the function it wraps.
 ///
 /// Fixed length is the point. Ticket 19: a variant that grinds rather than
 /// stalls reaches a deeper floor *for that reason alone*, which made one result
 /// look like +29 floors until every run was pinned to identical time, at which
 /// point it reversed. Any comparison this crate is used for must hold time
 /// constant.
-pub struct Run {
-    world: World,
+pub fn play(world: World, player: &mut impl Player, seconds: f64) -> Outcome {
+    play_sampling_every(world, player, seconds, 10.0)
+}
+
+pub fn play_sampling_every(
+    mut world: World,
+    player: &mut impl Player,
+    seconds: f64,
+    sample_every: f64,
+) -> Outcome {
+    let prestige_mult_in = world.prestige_mult_pub();
+    let mut samples = Vec::new();
+    let mut last_sample = 0.0;
+
+    while world.elapsed() < seconds {
+        // A sample is the state *after* the tick that began at `tick_start`,
+        // labelled with that start time. Testing the interval against the
+        // post-tick clock instead would fire two ticks early and label every
+        // sample one tick late — small enough to look like rounding, and enough
+        // to make a trace disagree with the reference model for no real reason.
+        let tick_start = world.elapsed();
+        world.step(player);
+        if tick_start - last_sample >= sample_every {
+            let mut s = world.sample();
+            s.t = tick_start;
+            samples.push(s);
+            last_sample = tick_start;
+        }
+    }
+
+    let peak = world.peak();
+    Outcome {
+        seconds: world.elapsed(),
+        peak,
+        gold_earned: world.totals().gold_earned,
+        totals: world.totals().clone(),
+        prestige_mult_in,
+        prestige_mult_earned: prestige_mult_for(world.tuning(), peak),
+        run: world.run().clone(),
+        samples,
+        locks: world.locks().to_vec(),
+    }
 }
 
 /// What a run produced.
@@ -61,71 +108,21 @@ pub struct Outcome {
     /// What this run's peak floor is worth as a single prestige. Shown to the
     /// player; the cumulative product never is (ADR 0007).
     pub prestige_mult_earned: f64,
+    /// The run as the save would write it — which is how a campaign carries
+    /// state from one run to the next.
+    pub run: Run,
     pub samples: Vec<Sample>,
     /// Every lock bought, with what the purchase was waiting on.
     pub locks: Vec<LockEvent>,
 }
 
-impl Run {
-    pub fn new(tuning: Tuning, prestige_mult: f64) -> Self {
-        Self { world: World::new(tuning, prestige_mult) }
-    }
-
-    pub fn world(&self) -> &World {
-        &self.world
-    }
-
-    /// Plays for `seconds` of simulated time, sampling every 10s.
-    pub fn play(self, player: &mut impl Player, seconds: f64) -> Outcome {
-        self.play_sampling_every(player, seconds, 10.0)
-    }
-
-    pub fn play_sampling_every(
-        mut self,
-        player: &mut impl Player,
-        seconds: f64,
-        sample_every: f64,
-    ) -> Outcome {
-        let prestige_mult_in = self.world.prestige_mult_pub();
-        let mut samples = Vec::new();
-        let mut last_sample = 0.0;
-
-        while self.world.elapsed() < seconds {
-            // A sample is the state *after* the tick that began at `tick_start`,
-            // labelled with that start time. Testing the interval against the
-            // post-tick clock instead would fire two ticks early and label
-            // every sample one tick late — small enough to look like rounding,
-            // and enough to make a trace disagree with the reference model for
-            // no real reason.
-            let tick_start = self.world.elapsed();
-            self.world.step(player);
-            if tick_start - last_sample >= sample_every {
-                let mut s = self.world.sample();
-                s.t = tick_start;
-                samples.push(s);
-                last_sample = tick_start;
-            }
-        }
-
-        let peak = self.world.peak();
-        Outcome {
-            seconds: self.world.elapsed(),
-            peak,
-            gold_earned: self.world.totals().gold_earned,
-            totals: self.world.totals().clone(),
-            prestige_mult_in,
-            prestige_mult_earned: prestige_mult_for(self.world.tuning(), peak),
-            samples,
-            locks: self.world.locks().to_vec(),
-        }
-    }
-}
-
 /// A sequence of runs with prestige between them.
 ///
-/// Prestige is `run = Run::default()` and nothing more (ticket 12): the set of
-/// things it resets **is** the type, which is why there is no field list here
-/// to keep in step with the ledger.
+/// Prestige is [`SaveGame::prestige`] and nothing more (ticket 12): the set of
+/// things it resets **is** [`SavedRun`], so there is no field list here to keep
+/// in step with the ledger. Running a campaign through the save type rather than
+/// through a loose `f64` is what keeps that true — if the two ever disagree, it
+/// shows up here first.
 pub fn campaign(
     tuning: &Tuning,
     runs: usize,
@@ -133,14 +130,15 @@ pub fn campaign(
     make_player: impl Fn() -> Box<dyn Player>,
 ) -> Vec<Outcome> {
     let mut out = Vec::with_capacity(runs);
-    let mut cumulative = 1.0;
-    let mut best_peak = 0;
+    let mut save = SaveGame::default();
 
     for _ in 0..runs {
         let mut player = make_player();
-        let outcome = Run::new(tuning.clone(), cumulative).play(&mut player, seconds_per_run);
-        best_peak = best_peak.max(outcome.peak);
-        cumulative = compound_prestige(tuning, cumulative, outcome.prestige_mult_earned, best_peak);
+        let world = World::resume(tuning.clone(), save.account.clone(), save.run.clone());
+        let outcome = play(world, &mut player, seconds_per_run);
+
+        save.run = outcome.run.clone();
+        save.prestige(tuning);
         out.push(outcome);
     }
     out

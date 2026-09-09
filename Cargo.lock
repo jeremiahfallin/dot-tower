@@ -2212,7 +2212,17 @@ name = "dot-tower"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "dot-tower-save",
  "dot-tower-sim",
+]
+
+[[package]]
+name = "dot-tower-save"
+version = "0.1.0"
+dependencies = [
+ "dot-tower-sim",
+ "ron 0.11.0",
+ "serde",
 ]
 
 [[package]]

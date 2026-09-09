@@ -343,10 +343,25 @@ impl SaveGame {
         Ok(repairs)
     }
 
-    /// What this run's peak floor is worth as a single prestige. Shown to the
-    /// player; the cumulative product never is.
+    /// What this run is worth as a single prestige. Shown to the player; the
+    /// cumulative product never is.
+    ///
+    /// [ADR 0014](../../../docs/adr/0014-the-multiplier-pays-for-new-territory.md):
+    /// this pays for **new territory only**, so it reads the account's
+    /// deepest-ever floor and must be called *before* prestige folds this run's
+    /// peak into it.
     pub fn earned_multiplier(&self, tuning: &Tuning) -> f64 {
-        prestige_mult_for(tuning, self.run.peak)
+        prestige_mult_for(tuning, self.new_territory(tuning))
+    }
+
+    /// The floors this run is paid for.
+    pub fn new_territory(&self, tuning: &Tuning) -> Floor {
+        match tuning.prestige_basis {
+            crate::tuning::PrestigeBasis::BeyondBest => {
+                self.run.peak.saturating_sub(self.account.best_peak)
+            }
+            crate::tuning::PrestigeBasis::Peak => self.run.peak,
+        }
     }
 
     /// Ends the run, keeping the account. **This is the whole of prestige.**
@@ -540,6 +555,44 @@ mod tests {
         let g = s.offline_grant(1_000, &t);
         assert_eq!(g.gold, 0.0);
         assert_eq!(g.paid_secs, 0.0);
+    }
+
+    /// ADR 0014's own guarantee: a fresh account is identical under either
+    /// basis, so every early-game number from tickets 06 and 08 stands.
+    #[test]
+    fn a_fresh_account_is_unaffected_by_the_new_basis() {
+        let mut s = SaveGame::default();
+        s.run.peak = 147;
+        let beyond = s.earned_multiplier(&Tuning::default());
+        let peak = s.earned_multiplier(&Tuning {
+            prestige_basis: crate::tuning::PrestigeBasis::Peak,
+            ..Default::default()
+        });
+        assert_eq!(beyond, peak);
+        // Ticket 08's measured value at floor 147, still standing.
+        assert!((beyond - 5.18).abs() < 0.02, "{beyond}");
+    }
+
+    /// The structural kill. Ticket 17 measured the old rule compounding to
+    /// 4.2e110 in twelve hours of five-minute cycles that fought nothing new;
+    /// re-conquered ground must be worth exactly nothing.
+    #[test]
+    fn re_conquering_old_ground_earns_nothing() {
+        let t = Tuning::default();
+        let mut s = SaveGame::default();
+        s.run.peak = 400;
+        s.prestige(&t);
+        let after_first = s.account.cumulative_prestige_mult;
+        assert!(after_first > 1.0);
+
+        // Ten more runs that never pass the record.
+        for _ in 0..10 {
+            s.run.peak = 399;
+            let ledger = s.prestige(&t);
+            assert_eq!(ledger.earned_multiplier, 1.0, "a run inside the record paid out");
+        }
+        assert_eq!(s.account.cumulative_prestige_mult, after_first, "prestige spam compounded");
+        assert_eq!(s.account.best_peak, 400, "and the record did not move");
     }
 
     #[test]

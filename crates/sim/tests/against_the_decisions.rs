@@ -10,7 +10,7 @@
 //! That is the price of testing a claim about an hour of play.
 
 use dot_tower_sim::autoplay::{BuyPolicy, Greedy, Station};
-use dot_tower_sim::tuning::LockPricing;
+use dot_tower_sim::tuning::{LockPricing, PrestigeBasis};
 use dot_tower_sim::{campaign, ClimberType, Player, Tuning};
 
 const HOUR: f64 = 3600.0;
@@ -21,6 +21,10 @@ const HOUR: f64 = 3600.0;
 /// against it rather than against the shipped tuning.
 fn pre_adr_0013() -> Tuning {
     Tuning {
+        // ADR 0014 changed what a run earns, so reproducing a pre-ADR reading
+        // needs the pre-ADR basis too — otherwise every run past the first
+        // compounds differently and the campaign diverges from run 2.
+        prestige_basis: PrestigeBasis::Peak,
         lock_pricing: LockPricing::Geometric,
         lock_free_below_best: false,
         lock_cost0: 500.0,

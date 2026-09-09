@@ -6,4 +6,4 @@
 //
 // `lock_free_below_best` is off because it did not exist then; leaving it on
 // would make this reproduce nothing in particular.
-(lock_pricing: Geometric, lock_free_below_best: false, lock_cost0: 500.0, lock_cost_base: 4.0)
+(prestige_basis: Peak, lock_pricing: Geometric, lock_free_below_best: false, lock_cost0: 500.0, lock_cost_base: 4.0)

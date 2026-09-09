@@ -69,6 +69,25 @@ pub enum LockPricing {
     Geometric,
 }
 
+/// What a run's earned multiplier is a function of.
+///
+/// [ADR 0014](../../../docs/adr/0014-the-multiplier-pays-for-new-territory.md):
+/// the account pays for **new territory only**. Under the shipped rule a run
+/// that never passes the account's deepest-ever floor earns ×1.00, which is what
+/// makes prestige-spam structurally impossible rather than merely unattractive.
+/// A fresh account is identical either way — best-ever is 0, so the delta is the
+/// peak — so every early-game number from tickets 06 and 08 stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum PrestigeBasis {
+    /// Peak beyond the account's deepest-ever floor.
+    #[default]
+    BeyondBest,
+    /// The run's peak floor outright. Retained to reproduce readings taken
+    /// before ADR 0014 — the reference model still defaults to it for the same
+    /// reason. Not a shipping option.
+    Peak,
+}
+
 /// How one prestige's earned multiplier becomes the account's cumulative one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum PrestigeMode {
@@ -210,6 +229,7 @@ pub struct Tuning {
     pub prestige_divisor: f64,
     pub prestige_exponent: f64,
     pub prestige_mode: PrestigeMode,
+    pub prestige_basis: PrestigeBasis,
 
     // --- rules the design settled but the model has never run ---
     /// Ticket 03: a floor nobody is fighting restores its pack, so attrition
@@ -294,6 +314,7 @@ impl Default for Tuning {
             prestige_divisor: 50.0,
             prestige_exponent: 1.2,
             prestige_mode: PrestigeMode::Compound,
+            prestige_basis: PrestigeBasis::BeyondBest,
 
             failed_floor_reset: false,
             sealed_income: false,
@@ -363,6 +384,15 @@ impl Tuning {
                 "lock_pricing is Geometric, which ADR 0013 replaced: no geometric base holds a \
                  constant relationship to income, so this drifts as the rank ladder is retuned. \
                  Correct for reproducing pre-ADR readings, wrong for anything else"
+                    .to_string(),
+            );
+        }
+        if self.prestige_basis == PrestigeBasis::Peak {
+            out.push(
+                "prestige_basis is Peak, which ADR 0014 replaced: a run that re-conquers old \
+                 ground earns a full multiplier, which is the prestige-spam engine that ticket 17 \
+                 measured compounding to 4.2e110 in twelve hours. Correct for reproducing \
+                 pre-ADR readings, wrong for anything else"
                     .to_string(),
             );
         }
@@ -453,6 +483,11 @@ mod tests {
         assert_eq!(t.lock_time_cost, 30.0);
         assert!(t.lock_free_below_best);
         assert!(t.warnings().is_empty(), "{:?}", t.warnings());
+    }
+
+    #[test]
+    fn the_shipped_game_pays_for_new_territory_only() {
+        assert_eq!(Tuning::default().prestige_basis, PrestigeBasis::BeyondBest);
     }
 
     #[test]

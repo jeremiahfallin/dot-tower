@@ -46,7 +46,6 @@ pub use tuning::Tuning;
 pub use types::{ClimberType, PerType};
 pub use world::{Climber, Player, World, DT};
 
-use curves::prestige_mult_for;
 
 /// Plays a world for `seconds` of simulated time, sampling every 10s.
 ///
@@ -97,7 +96,14 @@ pub fn play_sampling_every(
         gold_earned: world.totals().gold_earned,
         totals: world.totals().clone(),
         prestige_mult_in,
-        prestige_mult_earned: prestige_mult_for(world.tuning(), peak),
+        // Via the save so ADR 0014's basis is applied in one place; computing
+        // it from `peak` here would quietly pay for re-conquered ground.
+        prestige_mult_earned: SaveGame {
+            account: world.account().clone(),
+            run: world.run().clone(),
+            ..SaveGame::default()
+        }
+        .earned_multiplier(world.tuning()),
         run: world.run().clone(),
         samples,
         locks: world.locks().to_vec(),

@@ -169,3 +169,40 @@ Flag-gated in `06-progression-curve/model.mjs`, defaults byte-identical — veri
 `lockFreeBelowBest: false` (default), `sealedIncome: true` (default — withdrawal is opt-in so
 every prior ticket's reproduction stays exact). Probes must pass `bestEverFloor` explicitly;
 the free band only exists relative to an account history.
+
+## Comments
+
+### A second implementation of ADR 0013 disagrees at depth (session of 2026-09-09)
+
+Not reopening anything — the decision stands and this defers to it. But there are now two
+implementations of it, they disagree, and the disagreement should be visible on the ticket rather
+than only in a test file.
+
+[`crates/sim/`](../../../crates/sim) is the model reimplemented in Rust as the shipping
+simulation. Its geometric path reproduces `model.mjs` **tick for tick** — 1,974 consecutive samples
+identical on peak, lock line, crowd, ranks, hero level and gold, on two curves — so the port itself
+is sound and the disagreement is specifically in the new pricing.
+
+Under ADR 0013's pricing (K = 30, free below best, `sealed_income` off, six runs pinned to 60
+minutes), **run 1 agrees closely**: crowd 52 against this ticket's 57, 11 locks against 13. The two
+then diverge with account age:
+
+| | this ticket | `crates/sim` |
+|---|---|---|
+| run 6 peak, 60 min pinned | 746–789 | 614 |
+| run 6 crowd | 15 | 59 |
+| cap skips at depth | 0 | 139 |
+| floor 1,000 | run 7 | not by run 7 (765) |
+
+The pattern is that this implementation's lock line falls behind as the account matures, so the
+walk lengthens and the crowd piles up against the ceiling instead of settling. **One untested
+candidate**: here a free lock is still gated by `lock_margin`, so a mature account's blitz through
+its head start cannot claim the free band faster than 15 floors at a time, and the road stretches
+anyway. If the reference model lets the free band bypass the margin, that would explain both the
+crowd and the depth gap. Nobody has checked.
+
+Which is right is open. It matters because ADR 0011's ceiling requirement holds in one
+implementation and fails in the other, and because this crate is meant to be the instrument that
+checks decisions like this one — it cannot do that job while it disagrees with the readings the
+decision was made from. The failing assertion is kept, `#[ignore]`d with this explanation, in
+`crates/sim/tests/against_the_decisions.rs` rather than loosened.

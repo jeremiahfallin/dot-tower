@@ -34,7 +34,7 @@ use crate::curves::*;
 use crate::geometry::{Floor, FloorPos};
 use crate::metrics::{LockEvent, Sample, Totals};
 use crate::save::{Account, HeroProgress, Run, SLICE_HERO};
-use crate::tuning::{HealPolicy, Tuning};
+use crate::tuning::{HealPolicy, LockPricing, Tuning};
 use crate::types::{ClimberType, PerType};
 use std::collections::{HashMap, HashSet};
 
@@ -333,7 +333,37 @@ impl World {
 
     /// The floor the next lock would seal, and what it costs.
     pub fn next_lock(&self) -> (Floor, f64) {
-        (10 * (self.run.lock_level + 1), lock_cost(&self.tuning, self.run.lock_level + 1))
+        let floor = 10 * (self.run.lock_level + 1);
+        (floor, self.lock_price(floor))
+    }
+
+    /// What a lock sealing `floor` costs right now.
+    ///
+    /// [ADR 0013](../../../docs/adr/0013-locks-are-priced-in-time.md): the price
+    /// is K seconds of recent income, so it tracks the economy by construction
+    /// and cannot diverge when the rank ladder is retuned — which is what every
+    /// geometric curve did, because income compounds faster than per-kill gold.
+    /// And it is **free at or below the account's deepest-ever floor**, because
+    /// head start is conquered territory: re-locking it is bookkeeping, not a
+    /// decision.
+    pub fn lock_price(&self, floor: Floor) -> f64 {
+        if self.tuning.lock_free_below_best && floor <= self.account.best_peak {
+            return 0.0;
+        }
+        match self.tuning.lock_pricing {
+            LockPricing::Time => self.tuning.lock_time_cost * self.current_rate(),
+            LockPricing::Geometric => lock_cost(&self.tuning, self.run.lock_level + 1),
+        }
+    }
+
+    /// Gold per second over the trailing 60 seconds.
+    ///
+    /// The same window offline gold's best rate is drawn from — deliberately, so
+    /// a lock's price and the player's away-time entitlement are quoted against
+    /// one notion of "recent income" rather than two.
+    pub fn current_rate(&self) -> f64 {
+        let span = (self.t + DT).min(WINDOW);
+        if span <= 0.0 { 0.0 } else { self.gold_ring_sum / span }
     }
 
     /// Where the column piles up: the highest floor holding live climbers.
@@ -391,7 +421,7 @@ impl World {
         self.locks.push(LockEvent {
             t: self.t,
             floor: new_line,
-            cost: lock_cost(&self.tuning, self.run.lock_level + 1),
+            cost: self.lock_price(new_line),
             gold_wait: self.margin_eligible_since.map_or(0.0, |since| self.t - since),
         });
         self.margin_eligible_since = None;

@@ -73,32 +73,27 @@
     replacement: 1.67,
     composition: (melee: 4, ranged: 3, healer: 2),
 
-    // --- locking (ticket 20) ---
+    // --- locking (ADR 0013) ---
     //
-    // `lock_cost_base` is NOT an independent constant. It is `gold_base ^ 10`
-    // = 1.095^10, so a lock costs a constant number of kills at its depth
-    // forever. Retuning `gold_base` without moving this in step reintroduces
-    // exactly the failure ticket 20 resolved; `Tuning::lock_outrun` is the
-    // number to check, and it must read 1.00.
+    // A lock costs K seconds of recent income, measured on the same rolling
+    // 60-second window offline gold's best rate uses. Priced in time rather than
+    // in gold because no geometric base can hold a constant relationship to
+    // income: income compounds faster than per-kill gold, since kill rate grows
+    // with ranks, so any base fitted to today's rank ladder drifts the moment
+    // that ladder is retuned.
     //
-    //   above 1.00  the lock line falls permanently behind, climbers trail it by
-    //               tens of floors, and the per-type ceiling starts setting the
-    //               crowd size -- which ADR 0011 says it must never do
-    //   below 0.90  the lock is affordable the moment depth allows it, and
-    //               stops being a purchase at all
-    //
-    // `lock_cost0` is the crowd dial, and a nearly free one: across a 32x sweep
-    // the crowd went 6 -> 59 while peak floor moved 643 -> 616. At 1000 a lock
-    // costs ~147 kills at its depth, the crowd settles near 18 and trails the
-    // frontier by ~7 floors -- which fits ticket 10's 12-14 row tower column.
-    // This integer is authoring, not arithmetic; it is the one to move if the
-    // tower does not read as an army.
-    lock_cost0: 1000.0,
-    lock_cost_base: 2.4782276135,  // == 1.095^10, to ten places
-    // Deliberately NOT the crowd dial, though it can be made into one. Raising
-    // it to 40 also grows the crowd, but by gating the lock on depth rather than
-    // on gold: 91% of locks then arrive already affordable, and locking stops
-    // being a decision. Price the lock; do not delay it.
+    // K = 30 was ticket 20's pick. At 15 the purchase is trivial (3% of income);
+    // at 60 a fresh account waits seven minutes for its first lock; at 120 it
+    // never buys one at all.
+    lock_pricing: Time,
+    lock_time_cost: 30.0,
+    // Head start is conquered territory, so re-locking it is bookkeeping rather
+    // than a decision. Without this a mature account's blitz outruns the lock
+    // line and the walk balloons.
+    lock_free_below_best: true,
+    // Geometric fallback, used only to reproduce readings taken before ADR 0013.
+    lock_cost0: 500.0,
+    lock_cost_base: 4.0,
     lock_margin: 15,
 
     // --- offline (ticket 07) ---

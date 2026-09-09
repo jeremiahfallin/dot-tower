@@ -29,17 +29,20 @@ pub fn rank_cost(t: &Tuning, ty: ClimberType, rank: u32) -> f64 {
     t.types.get(ty).rank_cost0 * t.rank_cost_base.powf(rank as f64 - 1.0)
 }
 
-/// Gold cost of the `nth` lock, counting from 1.
+/// Gold cost of the `nth` lock under [`LockPricing::Geometric`], counting from 1.
 ///
-/// This function is [ticket 20](../../../.scratch/dot-tower/issues/20-travel-time-and-the-lock-curve.md)'s
-/// entire subject, and it resolved to a relationship rather than a number:
-/// `lock_cost_base == gold_base ^ 10`, so a lock costs a **constant number of
-/// kills at its depth, forever**. See [`Tuning::lock_outrun`].
+/// **Superseded as a shipping mechanism** by
+/// [ADR 0013](../../../docs/adr/0013-locks-are-priced-in-time.md): a lock is priced in
+/// *time*, K seconds of recent income, because no geometric base can hold a
+/// constant relationship to income. Income compounds faster than per-kill gold —
+/// kill rate grows with ranks — so any base fitted to the current rank ladder
+/// drifts the moment that ladder is retuned.
 ///
-/// Before that it grew ×4.00 per ten floors against income's ×2.478 — outrunning
-/// income by ×1.614 per lock and compounding, so lock 1 cost 74 kills at its
-/// depth and lock 47 cost 2.7×10¹¹. The lock line fell permanently behind the
-/// wall and travel time grew without bound.
+/// Retained because the reference model still defaults to it and every reading
+/// taken before ADR 0013 needs it to reproduce. At the pre-ADR shipped values it
+/// grew ×4.00 per ten floors against per-kill gold's ×2.478, so the lock line
+/// fell permanently behind the wall and travel time grew without bound: lock 1
+/// cost 74 kills at its depth and lock 47 cost 2.7×10¹¹.
 pub fn lock_cost(t: &Tuning, nth: u32) -> f64 {
     t.lock_cost0 * t.lock_cost_base.powf(nth as f64 - 1.0)
 }
@@ -100,7 +103,7 @@ mod tests {
     fn floor_one_is_the_base_value() {
         assert_eq!(enemy_hp(&t(), 1), 36.0);
         assert_eq!(gold_per_kill(&t(), 1), 3.0);
-        assert_eq!(lock_cost(&t(), 1), 1000.0);
+        assert_eq!(lock_cost(&t(), 1), 500.0);
         assert_eq!(rank_cost(&t(), ClimberType::Healer, 1), 45.0);
     }
 
@@ -115,21 +118,30 @@ mod tests {
         assert!(efficiency(1000) > efficiency(100));
     }
 
+    /// Why geometric pricing was rejected, stated as a property rather than as
+    /// a story: holding lock cost to a constant number of *kills* at its depth
+    /// does not hold it to a constant share of *income*, because income is kills
+    /// per second times gold per kill and only the second term is being matched.
+    /// A rank ladder that doubles kill rate halves the lock's real price.
     #[test]
-    fn a_lock_costs_a_constant_number_of_kills_at_its_depth() {
-        // The property ticket 20 settled on, stated the way a designer would
-        // read it rather than as a ratio of two bases.
-        let t = t();
+    fn matching_per_kill_gold_does_not_match_income() {
+        let t = Tuning { lock_cost_base: Tuning::default().income_per_lock(), ..t() };
+
+        // Per-kill gold: matched exactly, which is what made the idea appealing.
         let kills_for = |n: u32| lock_cost(&t, n) / gold_per_kill(&t, 10 * n);
-        let first = kills_for(1);
-        for n in [1, 5, 20, 60, 120] {
-            let k = kills_for(n);
-            assert!((k / first - 1.0).abs() < 1e-9, "lock {n} costs {k} kills against {first}");
-        }
-        // At `lock_cost0` 1000 that constant is ~147 kills. It is the crowd
-        // dial: ticket 20 measured the crowd at 6 when a lock costs ~18 kills
-        // and 59 when it costs ~590, at a cost of 4% in peak floor.
-        assert!((first - 147.0).abs() < 1.0, "a lock costs {first:.1} kills at its depth");
+        assert!((kills_for(20) / kills_for(1) - 1.0).abs() < 1e-9, "per-kill gold is matched");
+
+        // Income also rises with kill rate, and kill rate rises with rank. Two
+        // ranks of climber damage is a doubling of income that the lock price
+        // never sees.
+        let dps_at = |rank: u32| t.rank_power_base.powf(rank as f64 - 1.0);
+        let income_growth = dps_at(20) / dps_at(1);
+        assert!(income_growth > 10.0, "ranks move income by x{income_growth:.1}");
+        // So the lock's share of income has fallen by that whole factor.
+        assert!(
+            kills_for(20) / income_growth < kills_for(1) * 0.1,
+            "a base matched to per-kill gold still collapses as a share of income"
+        );
     }
 
     #[test]

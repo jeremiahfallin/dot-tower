@@ -39,9 +39,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None => Tuning::default(),
     };
     println!(
-        "tuning: {}   lock outrun x{:.3}   replacement {}s   composition {}/{}/{}",
+        "tuning: {}   locks {}   replacement {}s   composition {}/{}/{}",
         path.as_deref().unwrap_or("<shipped defaults>"),
-        tuning.lock_outrun(),
+        match tuning.lock_pricing {
+            dot_tower_sim::tuning::LockPricing::Time =>
+                format!("{}s of income{}", tuning.lock_time_cost,
+                    if tuning.lock_free_below_best { ", free below best" } else { "" }),
+            dot_tower_sim::tuning::LockPricing::Geometric =>
+                format!("geometric x{:.3}/lock", tuning.lock_cost_base),
+        },
         tuning.replacement,
         tuning.composition.melee,
         tuning.composition.ranged,

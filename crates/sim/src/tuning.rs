@@ -49,6 +49,26 @@ pub enum HealPolicy {
     Nearest,
 }
 
+/// How a lock is priced.
+///
+/// [ADR 0013](../../../docs/adr/0013-locks-are-priced-in-time.md) settled this,
+/// and the finding that forced it is worth restating because it is not obvious:
+/// **no geometric base can hold a constant relationship to income**, because
+/// income compounds faster than per-kill gold — kill rate grows with ranks, so
+/// `gold_base^10` per lock interval understates income growth. Any geometric
+/// match is therefore tuned-then-rot: it holds for the rank ladder it was fitted
+/// to and drifts the moment that ladder is retuned.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum LockPricing {
+    /// K seconds of recent income, matched to the economy by construction.
+    #[default]
+    Time,
+    /// `lock_cost0 * lock_cost_base^(n-1)`. Retained only to reproduce readings
+    /// taken before ADR 0013 — the reference model still defaults to it for the
+    /// same reason. Not a shipping option.
+    Geometric,
+}
+
 /// How one prestige's earned multiplier becomes the account's cumulative one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum PrestigeMode {
@@ -151,16 +171,28 @@ pub struct Tuning {
     /// player. The integers themselves wait on ticket 20.
     pub composition: PerType<u32>,
 
-    // --- locking ---
-    /// What the first lock costs. **This is the crowd dial**, and ticket 20
-    /// measured it as a nearly free one: across a 32x sweep at a scale-invariant
-    /// growth rate the crowd went 6 -> 59 while peak floor moved 643 -> 616.
-    /// How big the crowd is and how far it walks are the same number, so this
-    /// sets both.
+    // --- locking (ADR 0013) ---
+    pub lock_pricing: LockPricing,
+    /// **K**: how many seconds of recent income a lock costs under
+    /// [`LockPricing::Time`], measured on the same rolling 60-second window that
+    /// offline gold's best rate uses.
+    ///
+    /// Ticket 20 picked 30. At 15 the purchase is trivial (3% of income); at 60
+    /// a fresh account cannot afford one for seven minutes; at 120 it never buys
+    /// any. 30 puts run 1 at a 35-second cadence for 17% of income, which is a
+    /// decision the player can feel, and holds the walk inside ticket 10's
+    /// 12-14 row column across a ten-run campaign.
+    pub lock_time_cost: f64,
+    /// Locks at or below the account's deepest-ever floor cost nothing.
+    ///
+    /// Head start is conquered territory and re-locking it is bookkeeping, not a
+    /// decision. Without this, a mature account's blitz through its head start
+    /// outruns the lock line and the walk balloons — ticket 20 measured 268
+    /// floors mid-run at run 11 without it, against 17.4 with it.
+    pub lock_free_below_best: bool,
+    /// First lock's price under [`LockPricing::Geometric`] only.
     pub lock_cost0: f64,
-    /// How lock cost grows per lock. Only meaningful against
-    /// [`Self::income_per_lock`] — see [`Self::lock_outrun`], which is the
-    /// number ticket 20 is actually about.
+    /// Growth per lock under [`LockPricing::Geometric`] only.
     pub lock_cost_base: f64,
     /// Only buy the lock at floor 10k once peak floor is this far above it.
     pub lock_margin: u32,
@@ -248,16 +280,13 @@ impl Default for Tuning {
             // 4/3/2 mirrors the old 40/30/20 ceilings for the same reason.
             composition: PerType::new(4, 3, 2),
 
-            // Ticket 20. Both of these moved, and they moved for different
-            // reasons — one is structural, the other is authoring.
-            //
-            // `lock_cost_base` is NOT a free constant: it is `gold_base ^ 10`,
-            // so a lock costs the same number of kills at its depth forever.
-            // Above that the ceiling binds at depth and ADR 0011 fails; below
-            // it, locking stops being a purchase. If `gold_base` is ever
-            // retuned this must follow it — `lock_outrun` is what to check.
-            lock_cost0: 1000.0,
-            lock_cost_base: 1.095_f64.powf(10.0),
+            // ADR 0013. The shipped game prices locks in time; the geometric
+            // constants below exist only so pre-ADR readings reproduce.
+            lock_pricing: LockPricing::Time,
+            lock_time_cost: 30.0,
+            lock_free_below_best: true,
+            lock_cost0: 500.0,
+            lock_cost_base: 4.0,
             lock_margin: 15,
 
             offline_cap_hours: 12.0,
@@ -292,14 +321,13 @@ impl Tuning {
         self.gold_base.powf(10.0)
     }
 
-    /// How much faster lock cost grows than the income that pays for it.
+    /// How much faster geometric lock cost grows than **per-kill** gold.
     ///
-    /// This is ticket 20's whole subject, and the measured result is that it
-    /// wants to be **exactly 1.0**. Above 1 the lock line falls permanently
-    /// behind, travel time diverges, and the per-type ceiling starts setting the
-    /// crowd size — which [ADR 0011](../../../docs/adr/0011-composition-is-authored.md)
-    /// says it must never do. Below about 0.9 the lock is affordable the moment
-    /// depth allows it and stops being a purchase at all.
+    /// Kept for characterising [`LockPricing::Geometric`], and deliberately not
+    /// called a match to income: ADR 0013's central finding is that income
+    /// compounds faster than per-kill gold, because kill rate grows with ranks.
+    /// A ratio of 1.0 here is *not* a curve that tracks the economy — that
+    /// reasoning is exactly what the ADR rejects.
     pub fn lock_outrun(&self) -> f64 {
         self.lock_cost_base / self.income_per_lock()
     }
@@ -330,18 +358,16 @@ impl Tuning {
     /// decision that was expensive to reach is cheap to undo by accident.
     pub fn warnings(&self) -> Vec<String> {
         let mut out = Vec::new();
-        let k = self.lock_outrun();
-        if k > 1.0001 {
-            out.push(format!(
-                "lock cost outruns income by x{k:.3} per lock (ticket 20 settled x1.000): the lock \
-                 line will fall permanently behind the wall, and the per-type ceiling will set the \
-                 crowd size in violation of ADR 0011"
-            ));
-        } else if k < 0.9 {
-            out.push(format!(
-                "lock cost trails income at x{k:.3} per lock (ticket 20 settled x1.000): locks \
-                 become affordable the moment depth allows them, so locking stops being a purchase"
-            ));
+        if self.lock_pricing == LockPricing::Geometric {
+            out.push(
+                "lock_pricing is Geometric, which ADR 0013 replaced: no geometric base holds a \
+                 constant relationship to income, so this drifts as the rank ladder is retuned. \
+                 Correct for reproducing pre-ADR readings, wrong for anything else"
+                    .to_string(),
+            );
+        }
+        if self.lock_time_cost <= 0.0 {
+            out.push("lock_time_cost is not positive, so every lock is free".to_string());
         }
         if self.sealed_income {
             out.push(
@@ -419,11 +445,20 @@ impl Tuning {
 mod tests {
     use super::*;
 
-    /// Ticket 20's structural result, pinned. If `gold_base` moves and
-    /// `lock_cost_base` does not follow it, this is what says so.
+    /// ADR 0013: the shipped game prices locks in time, not geometrically.
     #[test]
-    fn the_shipped_lock_curve_neither_outruns_income_nor_trails_it() {
-        assert!((Tuning::default().lock_outrun() - 1.0).abs() < 1e-12);
+    fn the_shipped_game_prices_locks_in_time() {
+        let t = Tuning::default();
+        assert_eq!(t.lock_pricing, LockPricing::Time);
+        assert_eq!(t.lock_time_cost, 30.0);
+        assert!(t.lock_free_below_best);
+        assert!(t.warnings().is_empty(), "{:?}", t.warnings());
+    }
+
+    #[test]
+    fn geometric_pricing_is_flagged_as_superseded() {
+        let t = Tuning { lock_pricing: LockPricing::Geometric, ..Default::default() };
+        assert!(t.warnings().iter().any(|w| w.contains("ADR 0013")), "{:?}", t.warnings());
     }
 
     #[test]

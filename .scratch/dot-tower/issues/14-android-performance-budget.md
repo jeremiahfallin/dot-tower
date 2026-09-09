@@ -149,3 +149,37 @@ working this ticket: an incremental Rust change is cheap, but a `cargo clean`, a
 toolchain bump or a `Cargo.toml` feature edit costs eight minutes before Gradle's
 16s even starts — so batch the device experiments rather than rebuilding between
 each one.
+
+### Parked with the device line (session of 2026-09-08)
+
+Same decision as [ticket 22](22-bevy-ui-android-rendering.md)'s parking: the
+supply half of this ticket needs a device, the map's remaining tickets (17, 18,
+20, 21) do not, and the desk work goes first. Everything above stands.
+
+The next device session batches this with ticket 22's verdicts — every remaining
+reading here is logcat-visible and none is blocked by the broken HUD:
+
+- **Q1, cost half.** Frame time across 200–450 entities, the range the demand
+  half established. Twenty thousand would measure a case the game never
+  produces.
+- **Q3, cost half.** What one activation costs, at the measured 1–5/s rate.
+- **Q4.** Thermal throttling and fixed-timestep catch-up over a sustained
+  session.
+- **Q6.** Battery draw over 30 minutes.
+
+One caution carried forward from the demand half: those readings were taken
+under the **default** lock curve. Ticket 20 owns that curve, and if it lands a
+fix the crowd numbers move — the fixed-curve probe above already showed 88 → 9
+climbers at depth. Re-check the entity range against whatever curve ships
+before testing.
+
+### Entity range settled by ticket 20 (2026-09-08)
+
+The caution above resolved: the curve that ships is time-priced locks
+([ADR 0013](../../../docs/adr/0013-locks-are-priced-in-time.md)), and the
+10-run design campaign measures **entities max 157, mean 42** (the shipped
+geometric curve: max 213, mean 137). So the device session should frame-time
+**~40–160 entities**, not 200–450 — the demand half's range came from the
+broken curve's string-out. Peak-entity moments are early-run (fresh account,
+~57 climbers plus packs) and deep-run frontier surges; the sustained case is
+the mean, ~40.

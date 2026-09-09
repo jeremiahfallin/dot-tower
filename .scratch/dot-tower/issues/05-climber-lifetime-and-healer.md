@@ -190,3 +190,12 @@ healing with a taunting tank, against 3.5% with a hero that does not taunt.
 which retires the `FloorPos` radius gap this ticket raised — a reach that never crosses a floor
 needs no non-Euclidean distance rule. The healer's ±1 is not load-bearing (±0 through ±3 measured
 identically), so it can adopt the same rule whenever the coordinate question becomes inconvenient.
+
+### The individual carries no state — confirmed by ticket 21 (2026-09-08)
+
+This ticket left per-unit health deliberately unrendered ("deaths are legible
+in aggregate at the wall"); ticket 21 prototyped the alternative and caught it
+failing — per-unit health pips read as noise at phone scale
+([ADR 0016](../../../docs/adr/0016-type-reads-as-shape-hue-and-one-tag.md)).
+The aggregate at the wall is now the individual's *entire* state surface:
+nothing per-climber ever renders, above, below, or beside the sprite.

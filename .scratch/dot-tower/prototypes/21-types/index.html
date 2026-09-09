@@ -1,0 +1,347 @@
+<!doctype html>
+<!-- PROTOTYPE — throwaway. Ticket 21: telling the climber types apart.
+     Four design directions x colour-blind simulation x authored-resolution test,
+     in a mock tower column carrying the closed visual vocabulary (lock line,
+     wall hatch, aura, record line). Single file, no deps. Open in a browser. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>21 — telling the types apart</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: #14162a; color: #e8e6f0; font: 13px/1.45 ui-monospace, Menlo, monospace; padding: 12px; }
+  h1 { font-size: 14px; color: #9aa7ff; margin-bottom: 2px; }
+  .sub { color: #7d84a8; margin-bottom: 10px; }
+  main { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  aside { width: 300px; flex: none; }
+  @media (max-width: 760px) { main { flex-direction: column; align-items: center; } aside { width: min(460px, 100%); order: 2; } section { order: 1; } }
+  .panel { background: #1c1f38; border: 1px solid #2c3060; border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+  .panel h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #7d84a8; margin-bottom: 6px; }
+  button { background: #262a4d; color: #e8e6f0; border: 1px solid #3a3f7a; border-radius: 4px;
+           font: inherit; padding: 4px 8px; cursor: pointer; margin: 0 4px 4px 0; }
+  button.on { background: #5460ff; border-color: #7b85ff; }
+  label { display: block; margin: 4px 0; color: #c3c0da; }
+  select, input[type=range] { font: inherit; accent-color: #5460ff; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; background: #10122a; border-top: 1px solid #2c3060;
+         padding: 8px 14px; color: #ffd76e; font-size: 13px; }
+  #colwrap { flex: none; }
+  #column { background: #0c0d1c; border: 1px solid #2c3060; border-radius: 6px; image-rendering: pixelated; }
+  #board { background: #1c1f38; border: 1px solid #2c3060; border-radius: 6px; image-rendering: pixelated; }
+  .cap { color: #7d84a8; font-size: 11px; margin-top: 4px; }
+</style>
+</head>
+<body>
+<h1>21 — telling the types apart</h1>
+<div class="sub">melee · ranged · healer — at phone scale, in the column's closed vocabulary</div>
+
+<main>
+<aside>
+  <div class="panel">
+    <h2>Design direction</h2>
+    <div id="dirs"></div>
+  </div>
+  <div class="panel">
+    <h2>Colour vision</h2>
+    <div id="sims"></div>
+  </div>
+  <div class="panel">
+    <h2>Size</h2>
+    <label>Display scale <span id="scaleV"></span>×
+      <input type="range" id="scale" min="1" max="4" step="0.5" value="3"></label>
+    <label>Authored resolution
+      <select id="res">
+        <option value="16">16px (hand-authored)</option>
+        <option value="12">12px (downsampled)</option>
+        <option value="8">8px (downsampled)</option>
+        <option value="8h">8px (hand-authored, hybrid only)</option>
+      </select></label>
+    <label>Floor height (Q3 → ticket 10)
+      <select id="floorH">
+        <option value="40">40px — 16 floors in view</option>
+        <option value="48" selected>48px — 13 floors in view</option>
+        <option value="64">64px — 10 floors in view</option>
+      </select></label>
+    <label><input type="checkbox" id="pips"> per-unit health pip (Q2: does state need to show?)</label>
+    <label><input type="checkbox" id="tagAll" checked disabled> healer-only tag is part of the hybrid direction</label>
+  </div>
+  <div class="panel">
+    <h2>Composition (ADR 0011, 4/3/2)</h2>
+    <div class="cap">The column below shows a mature depth crowd — 15 alive, 7/5/3 — per ticket 20's numbers.</div>
+  </div>
+</aside>
+
+<section>
+  <div id="colwrap"><canvas id="column" width="390" height="660"></canvas>
+    <div class="cap">Tower column, 390px wide (same on phone and monitor, ticket 10). Lock line bottom,
+    record line dashed, wall hatched at top, hero aura lit on the wall row.</div>
+  </div>
+  <div><canvas id="board" width="390" height="150"></canvas>
+    <div class="cap">Sprite board: each type at the current settings (left) and at 1× authored pixels (right).</div>
+  </div>
+</section>
+</main>
+
+<div id="bar"></div>
+
+<script>
+'use strict';
+// ---------- palettes ----------
+const INK = '#141628';
+const PAL = {
+  melee:  { F: '#29adff', S: '#8b9bb4', W: '#dff3ff' },   // blue, steel shield
+  ranged: { F: '#ff8a3c', S: '#b25b1e', W: '#ffe3c2' },   // orange, bow
+  healer: { F: '#fff1e8', S: '#ffcd75', W: '#ffffff', T: '#ffcd75', H: '#3a3f7a' }, // pale + gold staff
+  neutral:{ F: '#c3c0da', S: '#7d84a8', W: '#e8e6f0' },
+};
+PAL.colourOnly = { melee: {F:'#e43b44',S:'#8b9bb4',W:'#ffd6d8'}, ranged: {F:'#38b764',S:'#1e7a46',W:'#d2f5df'}, healer: {F:'#41a6f6',S:'#2b6cb0',W:'#d9edff'} };
+
+// ---------- sprites (16×16 unless noted) ----------
+// melee: square shield slab left, squat body
+const MELEE = [
+'................',
+'................',
+'......XXXX......',
+'.....XFFFFX.....',
+'....XFFFFFFX....',
+'....XFWWFFFX....',
+'..SSXFFFFFFX....',
+'.SSSXFFFFFFX....',
+'.SSSXFFFFFFX....',
+'.SSSXFFFFFFX....',
+'.SSS.XFFFFFX....',
+'.SSS.XXXXXXX....',
+'.SSS..X...X.....',
+'..S..XX...XX....',
+'................',
+'................'];
+// ranged: tall thin, bow string right
+const RANGED = [
+'................',
+'.......XX....Y..',
+'......XFFX..Y...',
+'......XFFX..Y...',
+'......XWWX..Y...',
+'......XFFX..Y...',
+'......XFFXXYY...',
+'......XFFX..Y...',
+'......XFFX..Y...',
+'......XFFX..Y...',
+'......XFFX..Y...',
+'......X..X..Y...',
+'.....XX..XX.....',
+'................',
+'................',
+'................'];
+// healer: brimmed hat, gold staff + cross
+const HEALER = [
+'...T.....TT.....',
+'...T.....TT.....',
+'...T...XXXX.....',
+'...T..XHHHHX....',
+'...T.XHHHHHHX...',
+'...T...XFFX.....',
+'...T..XFFFX.....',
+'...T..XFWFX.....',
+'...T..XFFFX.....',
+'...T.XFFFFFX....',
+'...T..XFFFX.....',
+'...T..XFFFX.....',
+'...T..X..X......',
+'..TTT.XX.XX.....',
+'................',
+'................'];
+// neutral body for the tagged direction (ranged-like, hue-neutral)
+const NEUTRAL = RANGED.map(r => r.replace(/F/g, 'F').replace(/W/g, 'W'));
+// hand-authored 8×8 hybrid set
+const M8 = ['........','..XXXX..','.SXFFXS.','.SXWWXS.','.SXFFXS.','.S.XX.S.','...X....','........'];
+const R8 = ['...X.Y..','..XFX.Y.','..XWX.Y.','..XFX.Y.','..XFX.Y.','..X.X.Y.','..X..Y..','........'];
+const H8 = ['..TTT...','.XXXX...','.XFFX.T.','.XWX.T..','.XFX..T.','.XFX.T..','.X.X....','.X.X....'];
+
+const GRIDS16 = { melee: MELEE, ranged: RANGED, healer: HEALER, neutral: NEUTRAL };
+const GRIDS8  = { melee: M8, ranged: R8, healer: H8 };
+
+// ---------- directions ----------
+const DIRS = {
+  A: { name: 'A · Silhouette only', pal: () => ({ melee: {F:'#9aa0b8',S:'#5a5f7d',W:'#cfd3e6'}, ranged: {F:'#9aa0b8',S:'#5a5f7d',W:'#cfd3e6'}, healer: {F:'#cfd3e6',S:'#5a5f7d',W:'#ffffff',T:'#5a5f7d',H:'#3a3f7a'} }),
+       q: 'Shape carries everything — one ink family, no type hue. Do the three still read apart at 12px? At 8?' },
+  B: { name: 'B · Colour only', pal: () => PAL.colourOnly, grid: 'melee',
+       q: 'Same body for all three; hue is the only difference. Flip on deuteranopia — this is the failure the accessibility constraint predicts.' },
+  C: { name: 'C · Glyph tags', pal: () => ({ melee: PAL.neutral, ranged: PAL.neutral, healer: PAL.neutral }), tags: 'all',
+       q: 'Neutral bodies, tag above head: shield / arrow / cross. Legible at any distance — but three floating icons per unit: clarity or noise?' },
+  D: { name: 'D · Hybrid', pal: () => PAL, tags: 'healer',
+       q: 'Shape + colour-blind-safe hue (blue / orange / pale-gold) + healer-only cross tag — the tag answers Q4: notice the healer from furthest away.' },
+};
+let dir = 'D', sim = 'none', scale = 3;
+
+// ---------- colour-blind simulation (Machado et al. approximations) ----------
+const SIMS = {
+  none: null,
+  deuter: [[.367,.861,-.228],[.280,.673,.047],[-.012,.043,.969]],
+  prot:  [[.152,1.052,-.204],[.951,.691,.048],[-.004,.045,.959]],
+  trit:  [[1.256,-.077,-.179],[.079,.830,.091],[.005,.261,.734]],
+  achrom: [[.299,.587,.114],[.299,.587,.114],[.299,.587,.114]],
+};
+function applySim(ctx, w, h) {
+  const m = SIMS[sim]; if (!m) return;
+  const img = ctx.getImageData(0, 0, w, h), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i]/255, g = d[i+1]/255, b = d[i+2]/255;
+    d[i]   = 255*Math.min(1, Math.max(0, m[0][0]*r + m[0][1]*g + m[0][2]*b));
+    d[i+1] = 255*Math.min(1, Math.max(0, m[1][0]*r + m[1][1]*g + m[1][2]*b));
+    d[i+2] = 255*Math.min(1, Math.max(0, m[2][0]*r + m[2][1]*g + m[2][2]*b));
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+// ---------- sprite rasteriser ----------
+function gridFor(type, res) {
+  const D = DIRS[dir];
+  if (res === '8h') return { grid: GRIDS8[type], n: 8 };
+  if (res === '16') return { grid: D.grid ? GRIDS16[D.grid] : GRIDS16[type], n: 16 };
+  const n = +res, src = GRIDS16[D.grid || type], out = [];
+  for (let y = 0; y < n; y++) {
+    let row = '';
+    for (let x = 0; x < n; x++) {
+      const sx = Math.min(15, Math.floor(x * 16 / n)), sy = Math.min(15, Math.floor(y * 16 / n));
+      row += src[sy][sx];
+    }
+    out.push(row);
+  }
+  return { grid: out, n };
+}
+function drawSprite(ctx, type, x, y, px, res) {
+  const { grid, n } = gridFor(type, res);
+  const pal = DIRS[dir].pal()[type] || PAL.neutral;
+  const mapper = { X: INK };
+  for (const k in pal) mapper[k] = pal[k];
+  for (let gy = 0; gy < n; gy++) for (let gx = 0; gx < n; gx++) {
+    const ch = grid[gy][gx]; if (ch === '.') continue;
+    ctx.fillStyle = mapper[ch] || INK;
+    ctx.fillRect(x + gx*px, y + gy*px, px, px);
+  }
+  // tags for directions C (all) and D (healer only)
+  const wantTag = DIRS[dir].tags === 'all' || (DIRS[dir].tags === 'healer' && type === 'healer');
+  if (wantTag) {
+    ctx.fillStyle = type === 'healer' ? (pal.T || '#ffcd75') : type === 'melee' ? '#c3c0da' : '#c3c0da';
+    const t = Math.max(1, Math.round(px)), cx = x + n*px/2, ty = y - 2*t;
+    if (type === 'melee')      ctx.fillRect(cx - 2*t, ty - 2*t, 4*t, 4*t);                 // shield: solid square
+    else if (type === 'ranged'){ ctx.fillRect(cx - t, ty - 2*t, t, 4*t); ctx.fillRect(cx, ty - t, t, 2*t); } // arrow >
+    else { ctx.fillRect(cx - t/2, ty - 2*t, t, 4*t); ctx.fillRect(cx - 2*t, ty - t/2, 4*t, t); } // cross +
+  }
+}
+
+// ---------- the column scene ----------
+const TYPES = ['melee','ranged','healer'];
+// a mature depth crowd: 7/5/3 alive over the walk, hero aura on the wall
+const CLIMBERS = [];
+(function seed() {
+  const spec = { melee: 7, ranged: 5, healer: 3 };
+  let i = 0;
+  for (const t of TYPES) for (let k = 0; k < spec[t]; k++, i++)
+    CLIMBERS.push({ type: t, floor: 0.6 + ((i*7919) % 100)/100 * 8.2, off: ((i*104729) % 5)/5 - 0.4, bob: (i*2654435761 % 60)/60 });
+})();
+const ccol = document.getElementById('column'), cctx = ccol.getContext('2d');
+const bctx = document.getElementById('board').getContext('2d');
+let t0 = performance.now();
+
+function render(now) {
+  const floorH = +document.getElementById('floorH').value;
+  const res = document.getElementById('res').value;
+  const pips = document.getElementById('pips').checked;
+  const topFloor = 12.4, wallFloor = 12, recordFloor = 10.6, lockFloor = 1, heroFloor = 11.2;
+  const H = ccol.height, W = ccol.width;
+  const yOf = f => H - 24 - f * floorH;
+  const spritePx = Math.max(1, Math.floor(floorH / 5 / scale) ? Math.floor(scale) : scale); // displayed px per art pixel
+  const px = scale; // art pixel -> screen px
+  const size = (res === '8h' ? 8 : +res) * px;
+
+  cctx.clearRect(0, 0, W, H);
+  // floor rows
+  for (let f = 0; f <= Math.ceil(topFloor); f++) {
+    const y = yOf(f);
+    if (y < -floorH || y > H) continue;
+    cctx.fillStyle = (f % 5 === 0) ? '#12142b' : '#0e1022';
+    cctx.fillRect(0, y, W, floorH);
+    cctx.fillStyle = '#1d2044';
+    cctx.fillRect(0, y, W, 2);
+    cctx.fillStyle = '#262a52';
+    if (f % 5 === 0) for (let x = 6; x < W; x += 26) cctx.fillRect(x, y + 4, 2, 2); // rivets every 5 floors
+  }
+  // hero aura: lit row + multiplier (ticket 09/16)
+  const ay = yOf(heroFloor);
+  cctx.fillStyle = 'rgba(255,205,117,0.16)'; cctx.fillRect(0, ay, W, floorH);
+  cctx.fillStyle = '#ffd76e'; cctx.font = '10px ui-monospace';
+  cctx.fillText('×2', W - 26, ay + 12);
+  // wall: hatched band (ticket 09)
+  const wy = yOf(wallFloor);
+  cctx.save(); cctx.beginPath(); cctx.rect(0, wy - floorH, W, floorH); cctx.clip();
+  cctx.strokeStyle = 'rgba(232,90,90,0.55)'; cctx.lineWidth = 2;
+  for (let x = -floorH; x < W + floorH; x += 10) { cctx.beginPath(); cctx.moveTo(x, wy); cctx.lineTo(x + floorH, wy - floorH); cctx.stroke(); }
+  cctx.restore();
+  // record line (ADR 0015): dashed, with label
+  const ry = yOf(recordFloor);
+  cctx.strokeStyle = '#ffd76e'; cctx.setLineDash([5, 4]); cctx.lineWidth = 2;
+  cctx.beginPath(); cctx.moveTo(0, ry); cctx.lineTo(W, ry); cctx.stroke(); cctx.setLineDash([]);
+  cctx.fillStyle = '#ffd76e'; cctx.fillText('record 412', 8, ry - 5);
+  // lock line (ticket 10): solid, with glyph
+  const ly = yOf(lockFloor);
+  cctx.strokeStyle = '#5460ff'; cctx.lineWidth = 3;
+  cctx.beginPath(); cctx.moveTo(0, ly); cctx.lineTo(W, ly); cctx.stroke();
+  cctx.fillStyle = '#7b85ff'; cctx.fillText('lock', 8, ly - 6);
+  // climbers
+  const tsec = (now - t0) / 1000;
+  for (const c of CLIMBERS) {
+    const climb = c.floor + Math.sin(tsec * 0.05 + c.bob * 6.28) * 0.15 + tsec * 0.004;
+    const y = yOf(climb) - size + 3 + Math.sin(tsec * 2 + c.bob * 6.28) * 1.2;
+    const x = 14 + c.off * 30 + (c.type === 'melee' ? 0 : c.type === 'ranged' ? 150 : 75) + ((c.off * 60) % 60);
+    drawSprite(cctx, c.type, Math.min(W - size - 4, x), y, px, res);
+    if (pips) { // Q2: per-unit state — a 1px health pip under each sprite
+      cctx.fillStyle = '#38b764'; cctx.fillRect(Math.min(W - size - 4, x), y + size + 1, size * (0.35 + 0.6 * ((c.bob * 7) % 1)), 2);
+    }
+  }
+  // hero on the wall row (tank, ticket 16): aura ring + body
+  drawSprite(cctx, 'neutral', W - 90, yOf(heroFloor) - size + 4, px, res === '8h' ? '8h' : res);
+  applySim(cctx, W, H);
+
+  // sprite board
+  bctx.clearRect(0, 0, 390, 150);
+  bctx.fillStyle = '#12142b'; bctx.fillRect(0, 0, 390, 150);
+  const names = { melee: 'melee', ranged: 'ranged', healer: 'healer' };
+  TYPES.forEach((t, i) => {
+    const x = 16 + i * 128;
+    drawSprite(bctx, t, x, 20, scale, res);                       // current settings
+    drawSprite(bctx, t, x + 64, 20 + (res === '8h' ? 16 : 0), 1, res === '8h' ? '8h' : '16'); // 1× authored
+    bctx.fillStyle = '#c3c0da'; bctx.font = '10px ui-monospace';
+    bctx.fillText(names[t], x, 132);
+  });
+  applySim(bctx, 390, 150);
+  requestAnimationFrame(render);
+}
+
+// ---------- controls ----------
+function buildButtons(host, items, cur, set) {
+  host.innerHTML = '';
+  for (const [k, label] of items) {
+    const b = document.createElement('button');
+    b.textContent = label; if (k === cur) b.className = 'on';
+    b.onclick = () => { set(k); buildButtons(host, items, k, set); };
+    host.appendChild(b);
+  }
+}
+const dirsHost = document.getElementById('dirs');
+buildButtons(dirsHost, Object.entries(DIRS).map(([k, d]) => [k, d.name]), dir, k => {
+  dir = k; document.getElementById('bar').textContent = DIRS[k].q;
+});
+const simsHost = document.getElementById('sims');
+const simNames = { none: 'normal', deuter: 'deuteranopia', prot: 'protanopia', trit: 'tritanopia', achrom: 'achromatopsia' };
+buildButtons(simsHost, Object.keys(SIMS).map(k => [k, simNames[k]]), sim, k => { sim = k; });
+const sc = document.getElementById('scale'), scV = document.getElementById('scaleV');
+sc.oninput = () => { scale = +sc.value; scV.textContent = scale; };
+scV.textContent = scale;
+document.getElementById('bar').textContent = DIRS[dir].q;
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

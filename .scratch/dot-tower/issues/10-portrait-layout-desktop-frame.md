@@ -145,3 +145,13 @@ not in a list of prices.
 - **`frontier` is used across tickets 03, 06 and 10 but is not a glossary term**, and it is not a
   synonym for the wall — they coincide only once the climb has stalled. Left undefined rather than
   invented here; noted in the map's fog.
+
+### Floor height fixed by ticket 21 (2026-09-08)
+
+Ticket 21's smallest-sprite question ran backwards into this ticket's layout
+exactly as its Q3 predicted: **floor height 48px — 13 floors in view**, inside
+the 12–14-floor window this ticket measured, with sprites authored 16×16 and
+an 8×8 hand grid as the demonstrated readability floor
+([ADR 0016](../../../docs/adr/0016-type-reads-as-shape-hue-and-one-tag.md)).
+The column window, the lock interval, and the sprite budget now agree on one
+number.

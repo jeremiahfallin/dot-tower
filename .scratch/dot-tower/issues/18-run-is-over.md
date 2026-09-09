@@ -1,8 +1,12 @@
 # How the game says a run is over
 
 Type: grilling
-Status: open
+Status: resolved
 Blocked by: 17
+
+*Claimed 2026-09-08; grilling round presented to the user the same day — ticket 17's ADR 0014
+moved the value event from the stall to the past-your-best moment, which retires question 1's
+heuristic entirely and reshapes the rest.*
 
 ## Question
 
@@ -63,3 +67,62 @@ Two things for this ticket to carry:
 2. **The prestige ledger now has a third gain line** — earned multiplier, head start in floors, and
    relic currency. Ticket 08 judged line count safe because each has its own units, but this ticket
    owns whether the trigger stays legible with three things on it.
+
+## Comments
+
+### Premise settled by ticket 17 (2026-09-08)
+
+Ticket 17 decided *when* a run is over in value terms: the multiplier pays
+for new territory only ([ADR 0014](../../../docs/adr/0014-the-multiplier-pays-for-new-territory.md)),
+so a run is worth something from the moment it passes the account's
+best-ever floor and the optimal prestige lands shortly after — 1.5× faster
+than waiting for the stall. The measured facts this ticket's surface must
+carry: the **past-your-best moment** (concrete, spatial, on the tower), the
+×1.00 state before it (a ledger that says "this run has earned nothing yet"),
+and run lengths that lengthen with maturity (~40 min early, 2.5–3 h deep) so
+"the run is over" cannot lean on a fixed session length.
+
+## Answer
+
+Grilled 2026-09-08 — all five questions settled as recommended. Decision recorded in
+[ADR 0015](../../../docs/adr/0015-the-run-ends-at-your-own-record.md); **Record** added to
+`CONTEXT.md`.
+
+1. **The trigger is passing the record; stall detection retires from the design entirely.**
+   ADR 0014 made the run's value event exact, discrete, and saved: ×1.00 until the peak passes
+   the account's best-ever floor. No heuristic anywhere in the shipped game — offline gold
+   already uses best rate, and run end is the player's prestige. A false negative is now
+   impossible, which was this ticket's founding failure mode. The wall hatching and aggregate
+   deaths keep their jobs as the stall's *texture* (visible coasting), carrying no trigger
+   duty. Works at every depth, because the marker is account-relative, not clock-relative —
+   question 5's depth worry dissolves with the clock.
+2. **The record is a line on the tower column** — the lock-line / wall-hatch family. Before
+   the run passes it, the line shows the distance to beat; on a mature run it is the
+   re-conquest target the run climbs toward, giving ticket 17's lengthening runs their face.
+3. **The prestige affordance is always present and deliberately dumb** — a small permanent
+   control opening ticket 08's modal ledger. It never appears or disappears and never issues a
+   verdict; ticket 08's "no verdicts" reasoning holds at the trigger because the line's
+   position carries all the state. Early prestige needs no discouragement: the ledger shows
+   ×1.00, nothing gained — self-punishing and self-explaining, and the one-time explainer
+   covers the only moment with no baseline.
+4. **The strip gains exactly one line** — the run's running earned-state (new floors · ×earned;
+   before passing the record, record vs current peak). The temporal mirror of the spatial
+   line, per ticket 09's split; noted as an amendment on ticket 09.
+5. **Ticket 11's currency: no re-check needed, and its gain stays ledger-only.** The currency's
+   basis (peak beyond previous best) is now *identical* to the multiplier's — ADR 0014 unified
+   them — so the incentive divergence ticket 11 feared is structurally impossible; the
+   measurement tool 11 wanted arrived and answered for free. The third gain line stays on the
+   ledger (each gain has its own units); the trigger surfaces — the record line and the strip
+   line — never mention currency, so the moment stays singular.
+
+One closure with teeth: the tower column's visual vocabulary is now **closed** — lock line,
+wall hatch, aura, record. Ticket 21's type legibility must work within these four; nothing
+further is added to the column.
+
+### The closure held (2026-09-08)
+
+Ticket 21 spent the fixed budget this ticket handed it: the healer-only tag is
+**sprite anatomy, not column furniture**, so the four-mark vocabulary closed
+here — lock line, wall hatch, aura, record — holds unamended. Type reads on
+the climbers themselves as shape + hue
+([ADR 0016](../../../docs/adr/0016-type-reads-as-shape-hue-and-one-tag.md)).

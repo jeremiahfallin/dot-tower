@@ -165,3 +165,13 @@ tapping a floor. Ticket 10 owns the layout it sits in.
 
 The ticket has been retitled: it was "Making the hero placement tradeoff visible", which named a
 tradeoff ticket 16 proved does not exist.
+
+## Comments
+
+### Amended by ticket 18 (2026-09-08)
+
+The strip gained one line: the run's running earned-state (new floors and
+earned multiplier this run; record vs current peak before passing it). It is
+the temporal mirror of the record line ticket 18 put on the tower column —
+same split as ever, the strip says how it has been going, the column says
+where. The sparkline, ability record and verdicts are unchanged.

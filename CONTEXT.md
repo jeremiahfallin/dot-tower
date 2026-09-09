@@ -17,7 +17,10 @@ _Avoid_: Dungeon, run map
 **Lock**:
 A permanent-within-a-run gold purchase applied every 10 floors that raises the spawn point, so
 every climber's walk to the front starts higher. It is a spawn-point and travel-time mechanic:
-the floors beneath a lock are sealed and produce **no** income.
+the floors beneath a lock are sealed and produce **no** income. The price is set in **time** —
+a fixed number of seconds of recent income, so it tracks the economy by construction — and a
+lock below the **account**'s deepest-ever floor is free, because head start is conquered
+territory.
 _Avoid_: Seal, lockdown, gate
 
 **Lock line**:
@@ -35,7 +38,7 @@ An expendable, anonymous unit that spawns at the lock line and fights its way up
 _Avoid_: Unit, summon, minion, hero
 
 **Climber type**:
-A named behavioural archetype shared by many climbers — melee, ranged, or healer. Type is where identity, rank, and relic affinity attach.
+A named behavioural archetype shared by many climbers — melee, ranged, or healer. Type is where identity, rank, and relic affinity attach. Each type reads at a glance by **silhouette and a colour-blind-safe hue together** — never colour alone — and the healer alone carries a small tag above its head, so it is distinguishable from furthest away. A climber's state never renders; deaths read in aggregate at the wall.
 _Avoid_: Class, role, job
 
 **Rank**:
@@ -109,9 +112,18 @@ _Avoid_: Tower view, viewport, playfield, stage
 
 **Strip**:
 The single band above the ability bar carrying everything temporal — hero uptime over the last
-45 seconds, a record of ability presses, and a plain-language verdict on the most recent one.
-Everything spatial belongs on the **tower column** instead, and nothing appears in both.
+45 seconds, a record of ability presses, a plain-language verdict on the most recent one, and
+the run's running earned-state (new floors and earned multiplier so far this run). Everything
+spatial belongs on the **tower column** instead, and nothing appears in both.
 _Avoid_: HUD, status bar, panel, ticker
+
+**Record**:
+The line on the **tower column** marking the account's deepest-ever floor. A run earns nothing
+until it passes the record — the **prestige multiplier** pays for new territory only — so the
+record is both the run's target and its end: the moment the climb crosses it is the moment
+prestige starts being worth anything. It is not the **wall**; the record is where the account
+has been, not where the climb is stuck.
+_Avoid_: Best-ever, high-water mark, personal best, marker line
 
 ### Progression
 
@@ -134,9 +146,11 @@ _Avoid_: Rebirth, ascension, reset
 **Prestige multiplier**:
 The single permanent scalar applied to climber and hero health and damage. The only source of
 permanent raw power. Two readings matter and must not be confused. The **earned** multiplier is
-what one prestige is worth on its own, a function of that run's peak floor; it stays small and is
-shown to the player. The **cumulative** multiplier is the running product of every earned
-multiplier so far; it grows without bound and is never displayed — see **Head start**.
+what one prestige is worth on its own, a function of how far that run's peak floor went
+**beyond the account's deepest-ever floor** — a run that never passes the account's best earns
+nothing; it stays small and is shown to the player. The **cumulative** multiplier is the running
+product of every earned multiplier so far; it grows without bound and is never displayed — see
+**Head start**.
 _Avoid_: Ascension bonus, legacy bonus
 
 **Head start**:

@@ -155,3 +155,24 @@ screen built on invented numbers cannot be judged for honesty.
 
 Run 7's stall detection is noise — ticket 06 flags the heuristic at ±40% and at that depth it
 shows — so the mature case stops at prestiging out of run 5.
+
+## Comments
+
+### Amended by ticket 17 (2026-09-08)
+
+The multiplier a run earns now pays for peak beyond the account's best-ever
+floor ([ADR 0014](../../../docs/adr/0014-the-multiplier-pays-for-new-territory.md)).
+For this ticket's screen that means:
+
+- The ledger's earned-multiplier line is unchanged for a fresh account (Δ =
+  peak, so the ×5.18-at-147 numbers stand), and at maturity it shows the
+  honest small number: ×2.2–3.0 per mature run for 48–76 new floors. A run
+  that never passed the account's best shows **×1.00** — the itemised
+  before-committing design already makes that visible rather than a surprise,
+  which is exactly why this basis is safe to ship.
+- "Prestige is a stall decision" is retired at maturity: prestiging before
+  passing the best earns nothing, just past it is optimal (1.5× faster than
+  waiting for the stall). The trigger this screen serves is now the
+  **past-your-best moment**, and marking it belongs to ticket 18's surface.
+- Head start settles at ~21% of peak at maturity (26% early) — the promise
+  still never needs restating.

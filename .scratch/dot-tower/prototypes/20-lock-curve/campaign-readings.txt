@@ -1,0 +1,26 @@
+
+### shipped curve (geometric B=4.0)
+  run  1:  24 min  peak   130  locks   7  M 4.65e+0  head start   21 floors (16% of peak)
+  run  2:  48 min  peak   201  locks  12  M 3.22e+1  head start   48 floors (24% of peak)
+  run  3:  89 min  peak   300  locks  19  M 3.33e+2  head start   80 floors (27% of peak)
+  run  4: 102 min  peak   426  locks  27  M 4.98e+3  head start  118 floors (28% of peak)
+  run  5: 142 min  peak   601  locks  39  M 1.08e+5  head start  160 floors (27% of peak)
+  run  6: 164 min  peak   798  locks  52  M 3.23e+6  head start  207 floors (26% of peak)
+  run  7: 141 min  peak   997  locks  64  M 1.24e+8  head start  258 floors (26% of peak)
+  run  8:  88 min  peak  1165  locks  74  M 5.72e+9  head start  311 floors (27% of peak)
+  run  9:  35 min  peak   868  locks  55  M 1.88e+11  head start  359 floors (41% of peak)
+  run 10:  39 min  peak   983  locks  62  M 7.12e+12  head start  409 floors (42% of peak)
+  --> floor 1000 at run 8; entities max 213, mean 137
+
+### time-priced locks (K=30s)
+  run  1:  40 min  peak   145  locks  13  M 5.12e+0  head start   23 floors (16% of peak)
+  run  2:  35 min  peak   203  locks  18  M 3.58e+1  head start   49 floors (24% of peak)
+  run  3:  39 min  peak   285  locks  27  M 3.51e+2  head start   81 floors (28% of peak)
+  run  4: 125 min  peak   451  locks  43  M 5.58e+3  head start  119 floors (26% of peak)
+  run  5: 146 min  peak   630  locks  61  M 1.28e+5  head start  163 floors (26% of peak)
+  run  6: 169 min  peak   841  locks  82  M 4.05e+6  head start  210 floors (25% of peak)
+  run  7: 180 min  peak  1071  locks 105  M 1.69e+8  head start  262 floors (24% of peak)
+  run  8: 180 min  peak  1316  locks 130  M 8.96e+9  head start  317 floors (24% of peak)
+  run  9: 180 min  peak  1575  locks 156  M 5.84e+11  head start  375 floors (24% of peak)
+  run 10: 180 min  peak  1849  locks 183  M 4.59e+13  head start  435 floors (24% of peak)
+  --> floor 1000 at run 7; entities max 157, mean 42

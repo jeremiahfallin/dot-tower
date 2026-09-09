@@ -157,3 +157,11 @@ Run-1 figures moved around considerably. That is expected rather than alarming:
 this ticket already established that run-1 comparisons are untrustworthy unless
 pinned to identical wall-clock time, and it is the reason the resolution rests on
 the depth numbers.
+
+### The arrow got its shape (2026-09-08)
+
+ADR 0010 kept the arrow as "sprite flavour" with no mechanic attached; ticket
+21's hybrid direction delivers it — the ranged silhouette is a bow column
+([ADR 0016](../../../docs/adr/0016-type-reads-as-shape-hue-and-one-tag.md)).
+Flagged there as the art pass's first target: at column scale it distinguishes
+but reads as a pillar rather than a figure.

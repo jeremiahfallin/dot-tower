@@ -76,12 +76,39 @@ export const DEFAULTS = {
   // --- locking ---
   lockCost0: 500, lockCostBase: 4.0,
   lockMargin: 15,            // only lock 10k when peak floor is this far above it
+  lockPricing: 'geometric',  // 'geometric' = lockCost0 * lockCostBase^(k-1). Ticket 06's curve.
+                             // 'time' = lockTimeCost seconds of rolling-60s income (ticket 20).
+                             // Income grows FASTER than per-kill gold because kill rate compounds
+                             // with ranks, so no geometric base holds a constant relationship:
+                             // 2.478 (goldBase^10) under-matches -- locks go free and the stream
+                             // collapses onto the wall; 3.0 over-matches and travel diverges; 2.7
+                             // only matches by coincidence of the current rank-ladder constants
+                             // and would silently break on any retune. Pricing in time is matched
+                             // by construction.
+  lockTimeCost: 30,          // seconds of income one lock costs under 'time' pricing
+  lockFreeBelowBest: false,  // ticket 20: locks wholly below the account's deepest-ever floor are
+                             // free -- head start is conquered territory, and re-locking it is
+                             // bookkeeping, not a decision. Without this, a mature account's
+                             // blitz through its head start outruns any time-priced lock line
+                             // (K=30s caps it at 20 floors/min) and the road balloons to 260+
+                             // floors mid-run. The price -- and the decision -- live at the frontier.
 
   // --- prestige ---
   prestigeDivisor: 50, prestigeExponent: 1.2, // M = (1 + peak/divisor)^exponent
   prestigeMode: 'compound', // 'bestPeak' = M is a function of best-ever peak (does not compound)
                             // 'compound' = each run's multiplier multiplies the last
+  prestigeBasis: 'peak',    // ticket 17: 'peak' pays for the run's peak floor (the shipped rule);
+                            // 'beyondBest' pays only for peak past the account's best-ever floor,
+                            // so re-conquered head start earns nothing -- the structural
+                            // prestige-spam kill (a fresh account sees identical numbers either way)
   stallMinutes: 6,           // peak flat this long => the run is over
+  // Ticket 06 withdrew the sealed gold rate ("frozen floors emit nothing", per
+  // CONTEXT.md's Lock) but the model kept paying it because it measured 0.0% under
+  // the shipped curve. Ticket 20 found it is ~99% of income under ANY fixed lock
+  // curve (119 seals x their frozen 60s snapshots x forever), so the withdrawal
+  // now has teeth. Default true preserves the historical readings byte-for-byte;
+  // probes implementing the design set it false.
+  sealedIncome: true,
 
   // --- entity accounting (ticket 14) ---
   // Ticket 03: a floor is inert DATA until a climber comes "within a floor or
@@ -122,7 +149,7 @@ const climberHeal = (c, t, r, M) =>
   c.types[t].heal0 * Math.pow(c.rankPowerBase, r - 1) * (c.healScalesWithPrestige ? M : 1);
 
 // ---------- one run ----------
-export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt = 0.1, sampleEvery = 10 } = {}) {
+export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt = 0.1, sampleEvery = 10, bestEverFloor = 0 } = {}) {
   const c = cfg;
   const M = prestigeMult;
 
@@ -225,6 +252,20 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
     if (bandWindow.length > 20000) bandWindow.splice(0, 10000); // rolling, bounded
   }
 
+  // Rolling income rate over the last window of seconds -- the same window
+  // doLock() measures sealed floors with. Ticket 20's 'time' lock pricing keys
+  // on this so a lock always costs the same real thing: K seconds of now-income.
+  function rollingRate() {
+    const cutoff = t - WINDOW;
+    let sum = 0;
+    for (const [ts, , g] of bandWindow) if (ts >= cutoff) sum += g;
+    return sum / Math.min(WINDOW, Math.max(t, 1));
+  }
+  const lockPrice = (nextLockFloor) => {
+    if (c.lockFreeBelowBest && nextLockFloor <= bestEverFloor) return 0;  // conquered territory
+    return c.lockPricing === 'time' ? c.lockTimeCost * rollingRate() : lockCost(c, lockLevel + 1);
+  };
+
   function purchase() {
     // Greedy: buy the cheapest thing you can afford, forever. What a real player does.
     for (let guard = 0; guard < 50; guard++) {
@@ -232,7 +273,7 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
       for (const ty of ['melee', 'ranged', 'healer']) opts.push({ kind: 'rank', ty, cost: rankCost(c, ty, ranks[ty]) });
       opts.push({ kind: 'hero', cost: heroCost(c, heroLevel) });
       const nextLockFloor = 10 * (lockLevel + 1);
-      if (peak >= nextLockFloor + c.lockMargin) opts.push({ kind: 'lock', cost: lockCost(c, lockLevel + 1), floor: nextLockFloor });
+      if (peak >= nextLockFloor + c.lockMargin) opts.push({ kind: 'lock', cost: lockPrice(nextLockFloor), floor: nextLockFloor });
       opts.sort((a, b) => a.cost - b.cost);
       // The spending strategy reorders the options; affordability still decides.
       const pol = c.buyPolicy;
@@ -247,11 +288,11 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
       gold -= pick.cost;
       if (pick.kind === 'rank') ranks[pick.ty]++;
       else if (pick.kind === 'hero') heroLevel++;
-      else doLock(pick.floor);
+      else doLock(pick.floor, pick.cost);
     }
   }
 
-  function doLock(newLine) {
+  function doLock(newLine, cost) {
     // Measure what the band below the new line actually produced, then freeze it.
     const cutoff = t - WINDOW;
     let sum = 0;
@@ -263,7 +304,7 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
     for (const cl of climbers) if (cl.floor < lockLine()) { cl.floor = lockLine(); cl.prog = 0; }
     for (const f of [...floors.keys()]) if (f < lockLine()) floors.delete(f);
     if (heroFloor < lockLine()) heroFloor = lockLine();
-    events.push({ t, kind: 'lock', floor: newLine, sealedRate, measured });
+    events.push({ t, kind: 'lock', floor: newLine, cost, sealedRate, measured });
   }
 
   function currentWall() {
@@ -501,8 +542,8 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
       if (cl.prog >= 1) { cl.prog = 0; cl.floor++; if (cl.floor > peak) { peak = cl.floor; lastPeakGainAt = t; } }
     }
 
-    // --- sealed income ---
-    if (sealedRate > 0) { const g = sealedRate * M * dt; gold += g; goldEarned += g; }
+    // --- sealed income --- (withdrawn by ticket 06; see cfg.sealedIncome)
+    if (c.sealedIncome && sealedRate > 0) { const g = sealedRate * M * dt; gold += g; goldEarned += g; }
 
     // --- hero station ---
     if (c.heroStation !== 'off') {
@@ -588,7 +629,8 @@ export function simulateRun(cfg, { prestigeMult = 1, maxSeconds = 4 * 3600, dt =
     seconds: t, gold, goldEarned, peak, deaths, deathsByType, kills, healToHero, healToClimbers, healByKind,
     heroUptime: heroTicks ? heroAliveTicks / heroTicks : 1, heroDeaths, killsInAura, killsTotal,
     lockLevel, lockLine: lockLine(), sealedRate, ranks: { ...ranks }, heroLevel,
-    prestigeMultEarned: prestigeMultFor(c, peak),
+    prestigeMultEarned: prestigeMultFor(c,
+      c.prestigeBasis === 'beyondBest' ? Math.max(0, peak - bestEverFloor) : peak),
     samples, events, pop: climbers.length,
   };
 }
@@ -598,7 +640,7 @@ export function simulateCampaign(cfg, runs = 3, opts = {}) {
   const out = [];
   let M = 1, bestPeak = 0;
   for (let i = 0; i < runs; i++) {
-    const r = simulateRun(cfg, { ...opts, prestigeMult: M });
+    const r = simulateRun(cfg, { ...opts, prestigeMult: M, bestEverFloor: bestPeak });
     // how long did this run take to match the PREVIOUS run's peak?
     if (i > 0) {
       const prevPeak = out[i - 1].peak;

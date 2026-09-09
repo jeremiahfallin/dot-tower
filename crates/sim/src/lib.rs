@@ -13,13 +13,20 @@
 //! floor-reset rule at all. The map's fog says outright that if that model
 //! becomes a kept tool it needs checking against the decisions it is used to
 //! defend. So this is both the game's simulation and the instrument for
-//! [ticket 20](../../.scratch/dot-tower/issues/20-travel-time-and-the-lock-curve.md),
-//! which is the frontier for desktop.
+//! checking it — and it earns that by reproducing the reference model rather
+//! than by replacing it. See `sweeps/model-parity.ron`.
+//!
+//! **A reading is only meaningful with its method attached.** [`play`] pins the
+//! wall clock, because ticket 19 showed the stall heuristic cannot be compared
+//! across variants. But a pin shorter than a mature run's natural length reports
+//! the stream's opening transient and calls it depth — under ADR 0013 a mature
+//! run lasts 100-180 minutes, so an hour is a third of one. Pin to compare
+//! curves; run long to characterise one.
 //!
 //! ```no_run
-//! use dot_tower_sim::{autoplay::Greedy, tuning::Tuning, Run};
+//! use dot_tower_sim::{autoplay::Greedy, play, Tuning, World};
 //!
-//! let outcome = Run::new(Tuning::default(), 1.0).play(&mut Greedy::default(), 60.0 * 60.0);
+//! let outcome = play(World::new(Tuning::default(), 1.0), &mut Greedy::default(), 3600.0);
 //! println!("peak floor {}", outcome.peak);
 //! ```
 

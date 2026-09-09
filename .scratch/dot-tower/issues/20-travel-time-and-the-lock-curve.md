@@ -172,37 +172,33 @@ the free band only exists relative to an account history.
 
 ## Comments
 
-### A second implementation of ADR 0013 disagrees at depth (session of 2026-09-09)
-
-Not reopening anything — the decision stands and this defers to it. But there are now two
-implementations of it, they disagree, and the disagreement should be visible on the ticket rather
-than only in a test file.
+### A second implementation reproduces this ticket (session of 2026-09-09)
 
 [`crates/sim/`](../../../crates/sim) is the model reimplemented in Rust as the shipping
-simulation. Its geometric path reproduces `model.mjs` **tick for tick** — 1,974 consecutive samples
-identical on peak, lock line, crowd, ranks, hero level and gold, on two curves — so the port itself
-is sound and the disagreement is specifically in the new pricing.
+simulation, and ADR 0013 is now implemented in it. Cross-checked against `model.mjs` in three
+configurations, six runs of 60 minutes pinned, run-6 peak:
 
-Under ADR 0013's pricing (K = 30, free below best, `sealed_income` off, six runs pinned to 60
-minutes), **run 1 agrees closely**: crowd 52 against this ticket's 57, 11 locks against 13. The two
-then diverge with account age:
-
-| | this ticket | `crates/sim` |
+| | reference model | `crates/sim` |
 |---|---|---|
-| run 6 peak, 60 min pinned | 746–789 | 614 |
-| run 6 crowd | 15 | 59 |
-| cap skips at depth | 0 | 139 |
-| floor 1,000 | run 7 | not by run 7 (765) |
+| geometric 4.0, sealed income on | 569 | 569 |
+| geometric 4.0, sealed income off | 568 | 568 |
+| time K=30, free below best, sealed off | 620 | 614 |
 
-The pattern is that this implementation's lock line falls behind as the account matures, so the
-walk lengthens and the crowd piles up against the ceiling instead of settling. **One untested
-candidate**: here a free lock is still gated by `lock_margin`, so a mature account's blitz through
-its head start cannot claim the free band faster than 15 floors at a time, and the road stretches
-anyway. If the reference model lets the free band bypass the margin, that would explain both the
-crowd and the depth gap. Nobody has checked.
+The geometric path is identical tick for tick over 1,974 samples; the time path agrees to within
+1%. **Nothing in this ticket needs revisiting** — the decision reproduces independently.
 
-Which is right is open. It matters because ADR 0011's ceiling requirement holds in one
-implementation and fails in the other, and because this crate is meant to be the instrument that
-checks decisions like this one — it cannot do that job while it disagrees with the readings the
-decision was made from. The failing assertion is kept, `#[ignore]`d with this explanation, in
-`crates/sim/tests/against_the_decisions.rs` rather than loosened.
+**One correction to an earlier draft of this comment**, which claimed the two implementations
+disagreed at depth. They do not. The apparent disagreement was a difference in *method*: this
+ticket's Q2 and Q4 figures come from runs ending at the stall, where a mature run lasts 100–180
+minutes, and they were being compared against 60-minute pinned runs. A 60-minute pin truncates
+run 6 to about a third of its natural length, which catches the stream still in its early
+pile-up rather than at the steady state ADR 0011 is about. Given room to settle — six runs of
+180 minutes — `crates/sim` reproduces this ticket's picture: run 6 crowd 5, walk 2, **zero cap
+skips**, against the reference model's crowd 6 and walk 10.2 to stall.
+
+The lesson generalises past this ticket. Ticket 19 established that the stall heuristic cannot be
+compared *across variants*, and the harness therefore pins wall clock by default. But pinning is
+not free either: pinned to a length shorter than a mature run's natural one, it reports the
+stream's transient and calls it depth. **The two methods answer different questions** — pin to
+compare curves, run to stall to characterise one — and a reading is only meaningful with its
+method attached. Worth knowing before the next ticket takes a number from either.

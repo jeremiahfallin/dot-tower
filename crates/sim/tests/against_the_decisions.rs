@@ -33,14 +33,6 @@ fn greedy() -> Box<dyn Player> {
     Box::new(Greedy::default())
 }
 
-/// Late-run cap skips under a given tuning. Named apart because the test that
-/// uses it is asserting a *contrast*, and inlining it twice hid that.
-fn campaign_before(t: &Tuning) -> u64 {
-    let c = campaign(t, 6, HOUR, greedy);
-    let deep = c.last().unwrap();
-    deep.samples[deep.samples.len() * 2 / 3..].iter().map(|s| s.cap_skips).sum()
-}
-
 fn peaks(t: &Tuning, runs: usize) -> Vec<u32> {
     campaign(t, runs, HOUR, greedy).iter().map(|o| o.peak).collect()
 }
@@ -160,30 +152,32 @@ fn the_landed_curve_stays_far_inside_the_device_budget() {
 /// depth**, where the crowd is supposed to be the authored ratio and nothing
 /// else.
 ///
-/// **Currently failing, and deliberately not weakened.** Under this crate's
-/// implementation of ADR 0013 the ceiling binds at depth (139 skips in run 6's
-/// last third), while ticket 20 reports zero at the same replacement interval on
-/// the reference model. That is a disagreement between two implementations of
-/// the same decision, not a threshold to tune — and it travels with a second
-/// one: this crate reaches run-6 peaks of ~614 where ticket 20 reports 746-789.
-/// Both need resolving before this crate is trusted as a measuring instrument
-/// for anything ADR 0013 touches. Making the assertion looser would hide the
-/// only evidence that the two disagree.
+/// **The run must be long enough to reach its steady state.** A mature run under
+/// ADR 0013's pricing lasts 100-180 minutes before it stalls; pinned to 60 the
+/// stream is still in its opening pile-up, the ceiling binds, and the assertion
+/// fails against a transient rather than against depth. Ticket 19's rule — pin
+/// the wall clock, never compare on the stall heuristic — is about comparing
+/// *variants*; it does not license reading one variant's depth off a truncated
+/// run. See the comment on ticket 20.
 #[test]
-#[ignore = "known disagreement with ticket 20's readings; see the doc comment"]
 fn the_type_ceiling_does_not_bind_at_depth() {
     let landed = Tuning::default();
-    let campaign = campaign(&landed, 6, HOUR, greedy);
-    let deep = campaign.last().unwrap();
+    let landed_runs = campaign(&landed, 5, 2.5 * HOUR, greedy);
+    let deep = landed_runs.last().unwrap();
 
     let tail = &deep.samples[deep.samples.len() * 2 / 3..];
     let late: u64 = tail.iter().map(|s| s.cap_skips).sum();
     assert_eq!(late, 0, "the ceiling is binding at depth, so it is setting the crowd size");
 
-    // And under the curve ticket 20 replaced, it bound constantly — which is
-    // the finding, not an accident of this configuration.
-    let c = campaign_before(&pre_adr_0013());
-    assert!(c > 0, "the pre-ticket-20 curve should bind at depth; it is why the curve moved");
+    // And under the curve ADR 0013 replaced it bound constantly, at the same run
+    // length — which is the finding, not an accident of this configuration.
+    let before = campaign(&pre_adr_0013(), 5, 2.5 * HOUR, greedy);
+    let deep_before = before.last().unwrap();
+    let late_before: u64 = deep_before.samples[deep_before.samples.len() * 2 / 3..]
+        .iter()
+        .map(|s| s.cap_skips)
+        .sum();
+    assert!(late_before > 0, "the pre-ADR curve should still bind at depth; it is why it moved");
 }
 
 /// Ticket 15 measured buy-cheapest, buy-even and all-in-on-one-type spanning

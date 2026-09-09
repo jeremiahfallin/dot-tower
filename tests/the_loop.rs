@@ -126,11 +126,12 @@ fn a_run_survives_being_closed_and_reopened() {
     let mut app = harness(&dir);
     sim_ticks(&mut app, 600);
 
-    let (peak, gold) = {
+    let (peak, gold, earned) = {
         let session = app.world().resource::<Session>();
-        (session.world.peak(), session.world.gold())
+        (session.world.peak(), session.world.gold(), session.prestige_preview().earned_multiplier)
     };
     assert!(peak > 1, "nothing climbed in a minute of simulated time");
+    assert!(earned > 1.0, "a run into new territory was worth nothing");
 
     app.world_mut().write_message(WindowFocused { window: Entity::PLACEHOLDER, focused: false });
     app.update();
@@ -141,4 +142,13 @@ fn a_run_survives_being_closed_and_reopened() {
     assert_eq!(session.world.peak(), peak, "the peak floor did not survive");
     assert!(session.world.gold() >= gold, "gold did not survive");
     assert_eq!(session.world.elapsed(), 0.0, "the reopened run kept the old clock");
+    // ADR 0014 pays for territory beyond the account's record, and the record
+    // moves at prestige alone. If loading re-baselines it, closing the game
+    // mid-run quietly cancels everything that run was worth — which is what the
+    // strip would then report, as "1 to beat".
+    assert_eq!(
+        session.prestige_preview().earned_multiplier,
+        earned,
+        "reopening the game cancelled what the run had earned",
+    );
 }

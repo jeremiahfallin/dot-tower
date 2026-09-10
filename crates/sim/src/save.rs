@@ -187,33 +187,38 @@ impl Run {
     /// What prestige would destroy, named at its real value.
     ///
     /// Ticket 08 settled that the losses are itemised at their real values
-    /// (`melee rank 56 → 1`) rather than softened into minutes-to-recover, and
+    /// (`melee rank 56 -> 1`) rather than softened into minutes-to-recover, and
     /// shown **before committing, every time**. This is that list, and it lives
     /// next to the fields it enumerates so the two cannot drift apart.
+    ///
+    /// The separator is ASCII `->` rather than an arrow because this copy is
+    /// rendered verbatim on the prestige ledger, and the built-in font the game
+    /// still ships draws `→` as a missing-glyph box. Revisit when the pixel
+    /// font ADR 0016's art pass owes arrives.
     pub fn losses(&self) -> Vec<(&'static str, String)> {
         let fresh = Run::default();
         let mut out = vec![
-            ("gold", format!("{:.0} → 0", self.gold)),
-            ("floor reached", format!("{} → {}", self.peak, fresh.peak)),
-            ("locks", format!("{} → 0", self.lock_level)),
-            ("melee rank", format!("{} → {}", self.ranks.melee, fresh.ranks.melee)),
-            ("ranged rank", format!("{} → {}", self.ranks.ranged, fresh.ranks.ranged)),
-            ("healer rank", format!("{} → {}", self.ranks.healer, fresh.ranks.healer)),
+            ("gold", format!("{:.0} -> 0", self.gold)),
+            ("floor reached", format!("{} -> {}", self.peak, fresh.peak)),
+            ("locks", format!("{} -> 0", self.lock_level)),
+            ("melee rank", format!("{} -> {}", self.ranks.melee, fresh.ranks.melee)),
+            ("ranged rank", format!("{} -> {}", self.ranks.ranged, fresh.ranks.ranged)),
+            ("healer rank", format!("{} -> {}", self.ranks.healer, fresh.ranks.healer)),
         ];
         let fresh_hero = HeroProgress::default();
         for (hero, p) in &self.heroes {
             out.push((
                 "hero level",
                 format!(
-                    "{hero} level {} → {} ({:.0} experience → 0)",
+                    "{hero} level {} -> {} ({:.0} experience → 0)",
                     p.level, fresh_hero.level, p.experience
                 ),
             ));
         }
         if let Some((hero, floor)) = &self.stationed {
-            out.push(("stationed", format!("{hero} on floor {floor} → unstationed")));
+            out.push(("stationed", format!("{hero} on floor {floor} -> unstationed")));
         }
-        out.push(("best rate", format!("{:.0}/s → 0", self.best_rate)));
+        out.push(("best rate", format!("{:.0}/s -> 0", self.best_rate)));
         out
     }
 }
@@ -335,11 +340,29 @@ impl SaveGame {
             repairs.0.push(format!("peak floor was {}, raised to 1", self.run.peak));
             self.run.peak = 1;
         }
-        // The account's best-ever peak cannot be behind this run's, or a relic
-        // milestone already granted could be granted again.
-        if self.account.best_peak < self.run.peak {
-            self.account.best_peak = self.run.peak;
-        }
+        // The account's best-ever peak is deliberately NOT raised to this run's,
+        // though it is behind it for most of every run.
+        //
+        // Raising it reads as a harmless tidy-up, and it obeys ADR 0012's letter
+        // — nothing the save records is reduced. It breaks the rule anyway,
+        // because [ADR 0014] makes `best_peak` the *baseline* a run is paid
+        // against: raise it here and `new_territory` is zero, the ledger offers
+        // x1.00, and ticket 18's line on the strip reads "1 to beat". A player
+        // who climbs from a record of 50 to floor 100 and closes the game loses
+        // the entire prestige value of that run on the next load, silently,
+        // which is the exact failure this project exists against.
+        //
+        // So the record advances in one place and one place only:
+        // [`SaveGame::prestige`]. A save whose account is behind its run is not
+        // damaged — it is a run in progress, which is what most saves are.
+        //
+        // The original reason for raising it was that a relic milestone already
+        // granted could be granted again. That belongs to `account.relics`,
+        // which records what was actually granted, rather than to a floor number
+        // it can be inferred from. Nothing grants relics yet; whatever does must
+        // read that map.
+        //
+        // [ADR 0014]: ../../../docs/adr/0014-the-multiplier-pays-for-new-territory.md
         Ok(repairs)
     }
 
@@ -593,6 +616,44 @@ mod tests {
         }
         assert_eq!(s.account.cumulative_prestige_mult, after_first, "prestige spam compounded");
         assert_eq!(s.account.best_peak, 400, "and the record did not move");
+    }
+
+    /// The regression this file is most likely to reacquire: loading a save
+    /// must not move the record, because the record is what the run is paid
+    /// against. Written as a full round trip rather than a call to `validate`,
+    /// so it fails if the re-baselining comes back anywhere on the load path.
+    #[test]
+    fn loading_a_run_in_progress_keeps_what_it_has_earned() {
+        let t = Tuning::default();
+        let mut s = SaveGame::default();
+        s.account.best_peak = 50;
+        s.run.peak = 100;
+        let earned = s.earned_multiplier(&t);
+        assert!(earned > 1.0, "fifty new floors earned nothing");
+
+        let text = ron::ser::to_string_pretty(&s, ron::ser::PrettyConfig::default()).unwrap();
+        let mut back: SaveGame = ron::from_str(&text).unwrap();
+        let repairs = back.validate().unwrap();
+
+        assert!(repairs.is_empty(), "a run in progress is not damage: {repairs:?}");
+        assert_eq!(back.account.best_peak, 50, "loading moved the record");
+        assert_eq!(back.new_territory(&t), 50);
+        assert_eq!(back.earned_multiplier(&t), earned, "the run's value did not survive a load");
+    }
+
+    /// And the other half: the record does move, at the one moment it should.
+    #[test]
+    fn the_record_advances_only_at_prestige() {
+        let t = Tuning::default();
+        let mut s = SaveGame::default();
+        s.account.best_peak = 50;
+        s.run.peak = 100;
+
+        s.validate().unwrap();
+        assert_eq!(s.account.best_peak, 50);
+
+        s.prestige(&t);
+        assert_eq!(s.account.best_peak, 100, "prestige did not bank the run's peak");
     }
 
     #[test]
